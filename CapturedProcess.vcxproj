@@ -41,6 +41,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)bin\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -76,16 +77,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="array_helper.h" />
-    <ClInclude Include="CapturedProcess.h" />
-    <ClInclude Include="StdPipes.h" />
-    <ClInclude Include="regex_helper.h" />
-    <ClInclude Include="string_helper.h" />
+    <ClInclude Include="CapturedProcess/CapturedProcess.h" />
+    <ClInclude Include="CapturedProcess/StdPipes.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="createCapuredChildProcess.cpp" />
+    <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="AfterBuild">
+    <MakeDir Directories="bin" />
+    <CL Sources="DemoChildProc/DemoChildProc.cpp" ObjectFileName="DemoChildProc/DemoChildProc.obj" />
+    <Link Sources="DemoChildProc/DemoChildProc.obj" OutputFile="bin/DemoChildProc.exe" />
+  </Target>
 </Project>

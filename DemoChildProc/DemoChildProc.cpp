@@ -31,7 +31,7 @@ int main()
 		
 			_setmode(_fileno(stdout), _O_BINARY);
 			cout.write(&v[0], v.size());
-			//cout << len << " bytes written to '" << fileName << "'" << endl;
+			cout << len << " bytes written to '" << fileName << "'" << endl;
 			return 0;
 		}
 		else
