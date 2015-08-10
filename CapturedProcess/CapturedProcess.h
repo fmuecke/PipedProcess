@@ -1,9 +1,9 @@
 #pragma once
 
+#include "StdPipes.h"
 #include "windows.h"
 #include <vector>
 #include <algorithm>
-#include "StdPipes.h"
 
 #ifdef _DEBUG
 #include <string>
@@ -97,6 +97,7 @@ public:
 				pipes.Read(pipes.out_read, stdOutBytes);
 				pipes.Read(pipes.err_read, stdErrBytes);
 			}
+
 			::GetExitCodeProcess(procInfo.hProcess, &exitCode);
 			::CloseHandle(procInfo.hProcess);
 			::CloseHandle(procInfo.hThread);

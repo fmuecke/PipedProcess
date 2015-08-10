@@ -7,6 +7,7 @@ using namespace std;
 int main(int argc, char *argv[])
 {
 	vector<char> buffer(1000000, 'Ö');
+	auto x = sizeof(buffer);
 	CapturedProcess capturedProc;
 	capturedProc.SetStdInData(&buffer[0], buffer.size());
 	DWORD errorCode = capturedProc.Run("DemoChildProc.exe", "");
@@ -14,6 +15,14 @@ int main(int argc, char *argv[])
 	{
 		capturedProc.FetchStdOutData(buffer);
 		cout << buffer.size() << " bytes received" << endl;
+	}
+	else
+	{
+		if (capturedProc.HasStdErrData())
+		{
+			capturedProc.FetchStdErrData(buffer);
+			cerr << &buffer[0] << endl;
+		}
 	}
 
 	return 0;
