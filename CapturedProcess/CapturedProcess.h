@@ -115,6 +115,7 @@ public:
 	
 	bool HasStdOutData() const { return !stdOutBytes.empty(); }
 	bool HasStdErrData() const { return !stdErrBytes.empty(); }
+
 	void FetchStdOutData(std::vector<char>& outData)
 	{
 		outData.swap(stdOutBytes);

@@ -5,14 +5,7 @@
 
 struct StdPipes
 {
-	StdPipes()
-		: err_read(INVALID_HANDLE_VALUE)
-		, err_write(INVALID_HANDLE_VALUE)
-		, out_read(INVALID_HANDLE_VALUE)
-		, out_write(INVALID_HANDLE_VALUE)
-		, in_read(INVALID_HANDLE_VALUE)
-		, in_write(INVALID_HANDLE_VALUE)
-	{}
+	StdPipes()	{}
 
 	~StdPipes()
 	{
@@ -98,12 +91,12 @@ struct StdPipes
 	StdPipes(const StdPipes&) = delete;
 	StdPipes& operator=(const StdPipes&) = delete;
 	
-	HANDLE err_read;
-	HANDLE err_write;
-	HANDLE out_read;
-	HANDLE out_write;
-	HANDLE in_read;
-	HANDLE in_write;
+	HANDLE err_read = INVALID_HANDLE_VALUE;
+	HANDLE err_write = INVALID_HANDLE_VALUE;
+	HANDLE out_read = INVALID_HANDLE_VALUE;
+	HANDLE out_write = INVALID_HANDLE_VALUE;
+	HANDLE in_read = INVALID_HANDLE_VALUE;
+	HANDLE in_write = INVALID_HANDLE_VALUE;
 
 private:
 	SECURITY_ATTRIBUTES m_sa;
