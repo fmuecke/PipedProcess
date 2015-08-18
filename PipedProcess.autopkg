@@ -1,0 +1,22 @@
+﻿nuget {
+   nuspec {
+      id = PipedProcess;
+      version : 1.0.1.0;
+      title: PipedProcess;
+      authors: {Florian Mücke};
+      owners: {Florian Mücke};
+      licenseUrl: "https://raw.githubusercontent.com/fmuecke/PipedProcess/master/LICENSE";
+      iconUrl: "https://raw.githubusercontent.com/fmuecke/PipedProcess/master/nuget.png";
+      requireLicenseAcceptance:false;
+      summary: C++ API wrapper for process with enabled std pipes;
+      description: @"C++ helper class to create a child process with redirected std in/out/error streams using the Windows API.";
+      releaseNotes: "";
+      projectUrl: "https://github.com/fmuecke/PipedProcess";
+      copyright: Copyright (c) 2015 Florian Mücke. All rights reserved.;
+      tags: { c++, native, pipes, Winapi, process };
+   };
+ 
+   files {
+      include: { PipedProcess\*.h };
+   };
+}
