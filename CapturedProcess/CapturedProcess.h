@@ -25,62 +25,58 @@ public:
 		// arguments need to be in a non const array for the API call
 		auto len = strlen(arguments) + 1;
 		std::vector<char> args(static_cast<int>(len), 0);
-		std::copy(arguments, arguments + len,
-			stdext::checked_array_iterator<char*>(&args[0], len));
+		std::copy(arguments, arguments + len, stdext::checked_array_iterator<char*>(&args[0], len));
 
 		StdPipes pipes;
 		pipes.Create();
 
 		STARTUPINFOA startInfo;
-		ZeroMemory(&startInfo, sizeof(STARTUPINFOA));
-		startInfo.cb = sizeof(STARTUPINFOA);
-		startInfo.hStdOutput = pipes.out_write;
+        ::SecureZeroMemory(&startInfo, sizeof(startInfo));
+        startInfo.cb = sizeof(startInfo);
+        startInfo.hStdInput = stdInBytes.empty() ? 0 : pipes.in_read;
+        startInfo.hStdOutput = pipes.out_write;
 		startInfo.hStdError = pipes.err_write;
-		startInfo.dwFlags |= STARTF_USESTDHANDLES;
-		if (!stdInBytes.empty())
-		{
-			startInfo.hStdInput = pipes.in_read;
-		}
+        startInfo.dwFlags |= STARTF_USESTDHANDLES;
 
 		PROCESS_INFORMATION procInfo;
-		::ZeroMemory(&procInfo, sizeof(PROCESS_INFORMATION));
+        ::SecureZeroMemory(&procInfo, sizeof(procInfo));
 
-		// Create the child process. 
+		// Create the child process.
 		bool success = ::CreateProcessA(
-			program,          // executable
-			&args[0],      // argumenst (writable buffer)
-			NULL,             // process security attributes 
-			NULL,             // primary thread security attributes 
-			TRUE,             // handles are inherited 
-			0,                // creation flags 
-			NULL,             // use parent's environment 
-			NULL,             // use parent's current directory 
-			&startInfo,       // STARTUPINFO 
-			&procInfo) != 0;  // receives PROCESS_INFORMATION
+						   program,          // executable
+						   &args[0],      // argumenst (writable buffer)
+						   NULL,             // process security attributes
+						   NULL,             // primary thread security attributes
+						   TRUE,             // handles are inherited
+						   0,                // creation flags
+						   NULL,             // use parent's environment
+						   NULL,             // use parent's current directory
+						   &startInfo,       // STARTUPINFO
+						   &procInfo) != 0;  // receives PROCESS_INFORMATION
 
-		DWORD exitCode = -1;
+		DWORD exitCode = static_cast<DWORD>(-1);
 		if (!success)
 		{
 			exitCode = ::GetLastError();
 #ifdef _DEBUG
 			std::error_code code(exitCode, std::system_category());
 			std::cerr << "error: unable to create process '"
-				<< program
-				<< "': " << code.message() << std::endl;
+					  << program
+					  << "': " << code.message() << std::endl;
 #endif
 		}
 		else
 		{
 			if (!stdInBytes.empty())
 			{
-				DWORD bytesWritten(0);
-				if (!::WriteFile(pipes.in_write, &stdInBytes[0], stdInBytes.size(), &bytesWritten, NULL))
+                DWORD bytesWritten(0);
+				if (!::WriteFile(pipes.in_write, &stdInBytes[0], (DWORD)stdInBytes.size(), &bytesWritten, NULL))
 				{
 					exitCode = ::GetLastError();
 #ifdef _DEBUG
 					std::error_code code(exitCode, std::system_category());
-					std::cerr << "error: unable write input stream: "
-						<< code.message() << std::endl;
+					std::cerr << "error: unable to write input stream: "
+							  << code.message() << std::endl;
 #endif
 				}
 				else
@@ -90,21 +86,26 @@ public:
 				}
 			}
 
-			pipes.CloseWriteHandles();
+            pipes.CloseWriteHandles();
 
 			while (WAIT_TIMEOUT == ::WaitForSingleObject(procInfo.hProcess, 50))
 			{
-				pipes.Read(pipes.out_read, stdOutBytes);
-				pipes.Read(pipes.err_read, stdErrBytes);
-			}
+				if (!pipes.HasData(pipes.out_read))
+				{
+					continue;
+				}
 
-			::GetExitCodeProcess(procInfo.hProcess, &exitCode);
+                pipes.Read(pipes.out_read, stdOutBytes);
+                pipes.Read(pipes.err_read, stdErrBytes);
+            }
+            
+            ::GetExitCodeProcess(procInfo.hProcess, &exitCode);
 			::CloseHandle(procInfo.hProcess);
 			::CloseHandle(procInfo.hThread);
 		}
 
-		// To avoid resource leaks in a larger application, close handles explicitly.
-		// --> already done in std pipe wrapper
+		// note: all pipe handles will be closed by the std pipe wrapper class
+
 		return exitCode;
 	}
 
