@@ -1,4 +1,4 @@
-# CapturedProcess
+# PipedProcess
 C++ helper class to create a child process with redirected std in/out/error streams 
 using the Windows API.
 

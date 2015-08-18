@@ -11,13 +11,13 @@
 #include <iostream>
 #endif
 
-class CapturedProcess
+class PipedProcess
 {
 public:
-	CapturedProcess()
+	PipedProcess()
 	{}
 
-	~CapturedProcess()
+	~PipedProcess()
 	{}
 
 	DWORD Run(const char* program, const char* arguments)

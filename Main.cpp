@@ -1,25 +1,25 @@
 #include <iostream>
 #include <vector>
-#include "CapturedProcess/CapturedProcess.h"
+#include "PipedProcess/PipedProcess.h"
 
 using namespace std;
 
 int main(int argc, char *argv[])
 {
 	vector<char> buffer(1000000, 'Ö');
-	CapturedProcess capturedProc;
-	capturedProc.SetStdInData(&buffer[0], buffer.size());
-	DWORD errorCode = capturedProc.Run("DemoChildProc.exe", "");
+    PipedProcess proc;
+	proc.SetStdInData(&buffer[0], buffer.size());
+	DWORD errorCode = proc.Run("DemoChildProc.exe", "");
 	if (errorCode == NO_ERROR)
 	{
-		capturedProc.FetchStdOutData(buffer);
+		proc.FetchStdOutData(buffer);
 		cout << buffer.size() << " bytes received" << endl;
 	}
 	else
 	{
-		if (capturedProc.HasStdErrData())
+		if (proc.HasStdErrData())
 		{
-			capturedProc.FetchStdErrData(buffer);
+			proc.FetchStdErrData(buffer);
 			cerr << &buffer[0] << endl;
 		}
 	}
