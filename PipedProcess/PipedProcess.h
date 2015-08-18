@@ -1,3 +1,7 @@
+// This file is part of the PipedProcess project.
+// See LICENSE file for further information (BSD 3-clause)
+// https://github.com/fmuecke/PipedProcess
+
 #pragma once
 
 #include "StdPipes.h"
