@@ -115,7 +115,8 @@ public:
 
 	void SetStdInData(const char* pData, size_t len)
 	{
-		stdInBytes.swap(std::vector<char>(pData, pData + len));
+        std::vector<char> tmp(pData, pData + len);
+        stdInBytes.swap(tmp);
 	}
 	
 	bool HasStdOutData() const { return !stdOutBytes.empty(); }

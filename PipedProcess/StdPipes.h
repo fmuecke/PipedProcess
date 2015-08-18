@@ -70,7 +70,7 @@ struct StdPipes
         std::array<char, 256> buffer;
         DWORD bytesRead = 0;
         DWORD bytesAvailable = 0;
-        bool success = ::PeekNamedPipe(hPipe, &buffer[0], static_cast<DWORD>(buffer.size()), &bytesRead, &bytesAvailable, NULL) != 0;
+        ::PeekNamedPipe(hPipe, &buffer[0], static_cast<DWORD>(buffer.size()), &bytesRead, &bytesAvailable, NULL);
         return bytesAvailable > 0 || bytesRead > 0;
     }
 
