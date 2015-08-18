@@ -5,7 +5,7 @@
 
 struct StdPipes
 {
-	StdPipes()	{}
+	StdPipes()  {}
 
 	~StdPipes()
 	{
@@ -60,6 +60,15 @@ struct StdPipes
 		}
 	}
 
+    static bool HasData(HANDLE hPipe)
+    {
+        std::array<char, 256> buffer;
+        DWORD bytesRead = 0;
+        DWORD bytesAvailable = 0;
+        bool success = ::PeekNamedPipe(hPipe, &buffer[0], static_cast<DWORD>(buffer.size()), &bytesRead, &bytesAvailable, NULL) != 0;
+        return bytesAvailable > 0 || bytesRead > 0;
+    }
+
 	static bool Read(HANDLE hPipe, std::vector<char>& result)
 	{
 		std::array<char, 4096> buffer;
@@ -68,7 +77,7 @@ struct StdPipes
 		for (;;)
 		{
 			DWORD bytesRead = 0;
-			bool success = ::ReadFile(hPipe, &buffer[0], buffer.size(), &bytesRead, NULL) != 0;
+			bool success = ::ReadFile(hPipe, &buffer[0], static_cast<DWORD>(buffer.size()), &bytesRead, NULL) != 0;
 			if (!success || bytesRead == 0)
 			{
 				if (_result.empty())
@@ -90,7 +99,7 @@ struct StdPipes
 
 	StdPipes(const StdPipes&) = delete;
 	StdPipes& operator=(const StdPipes&) = delete;
-	
+
 	HANDLE err_read = INVALID_HANDLE_VALUE;
 	HANDLE err_write = INVALID_HANDLE_VALUE;
 	HANDLE out_read = INVALID_HANDLE_VALUE;
