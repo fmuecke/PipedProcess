@@ -18,6 +18,11 @@
 class PipedProcess
 {
 public:
+	struct EmptyAbortEvent
+	{
+		bool IsSet() const { return false; }
+	};
+
 	PipedProcess()
 	{}
 
@@ -25,6 +30,13 @@ public:
 	{}
 
 	DWORD Run(const char* program, const char* arguments)
+	{
+		EmptyAbortEvent event;
+		return Run(program, arguments, event);
+	}
+
+	template<class T>
+	DWORD Run(const char* program, const char* arguments, T& abortEvent)
 	{
 		// arguments need to be in a non const array for the API call
 		auto len = strlen(arguments) + 1;
@@ -96,6 +108,11 @@ public:
 			{
 				if (!pipes.HasData(pipes.out_read))
 				{
+					if (abortEvent.IsSet())
+					{
+						::TerminateProcess(procInfo.hProcess, HRESULT_CODE(E_ABORT));
+						break;
+					}
 					continue;
 				}
 
