@@ -74,10 +74,14 @@ struct StdPipes
         return bytesAvailable > 0 || bytesRead > 0;
     }
 
-	static bool Read(HANDLE hPipe, std::vector<char>& result)
+	enum class ReadMode { append, truncate };
+	static bool Read(HANDLE hPipe, std::vector<char>& result, ReadMode mode)
 	{
 		std::array<char, 4096> buffer;
 		std::vector<char> _result;
+
+		using std::begin;
+		using std::end;
 
 		for (;;)
 		{
@@ -94,10 +98,18 @@ struct StdPipes
 				break;
 			}
 
-			_result.insert(std::end(_result), std::begin(buffer), std::begin(buffer) + bytesRead);
+			std::move(begin(buffer), begin(buffer) + bytesRead, std::back_inserter(_result));
 		}
 
-		result.swap(_result);
+		if (mode == ReadMode::append)
+		{
+			result.reserve(result.size() + _result.size());
+			std::move(begin(_result), end(_result), std::back_inserter(result));
+		}
+		else
+		{
+			result.swap(_result);
+		}
 
 		return true;
 	}
