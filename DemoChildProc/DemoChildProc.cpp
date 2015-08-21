@@ -72,6 +72,8 @@ int main()
 	{
 		// do some program logic here...
 		cerr << "... doing program logic ..." << endl;
+		
+		cout << "nonsens" << flush;
 		Sleep(5000);
 		
 		return WriteOurput(resultData);

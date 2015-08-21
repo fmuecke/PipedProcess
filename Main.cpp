@@ -12,14 +12,14 @@ int main(int argc, char *argv[])
 	DWORD errorCode = proc.Run("DemoChildProc.exe", "");
 	if (errorCode == NO_ERROR)
 	{
-		proc.FetchStdOutData(buffer);
+		buffer = proc.FetchStdOutData();
 		cout << buffer.size() << " bytes received" << endl;
 	}
 	else
 	{
 		if (proc.HasStdErrData())
 		{
-			proc.FetchStdErrData(buffer);
+			buffer = proc.FetchStdErrData();
 			cerr << &buffer[0] << endl;
 		}
 	}

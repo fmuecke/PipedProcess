@@ -70,7 +70,7 @@ public:
 						   &startInfo,       // STARTUPINFO
 						   &procInfo) != 0;  // receives PROCESS_INFORMATION
 
-		DWORD exitCode = static_cast<DWORD>(-1);
+		DWORD exitCode = ERROR_INVALID_FUNCTION;
 		if (!success)
 		{
 			exitCode = ::GetLastError();
@@ -116,14 +116,19 @@ public:
 					continue;
 				}
 
-                pipes.Read(pipes.out_read, stdOutBytes);
-                pipes.Read(pipes.err_read, stdErrBytes);
+                pipes.Read(pipes.out_read, stdOutBytes, StdPipes::ReadMode::append);
+				pipes.Read(pipes.err_read, stdErrBytes, StdPipes::ReadMode::append);
             }
             
-            ::GetExitCodeProcess(procInfo.hProcess, &exitCode);
+			pipes.Read(pipes.out_read, stdOutBytes, StdPipes::ReadMode::append);
+			pipes.Read(pipes.err_read, stdErrBytes, StdPipes::ReadMode::append);
+			
+			::GetExitCodeProcess(procInfo.hProcess, &exitCode);
 			::CloseHandle(procInfo.hProcess);
 			::CloseHandle(procInfo.hThread);
 		}
+
+		stdInBytes.clear();
 
 		// note: all pipe handles will be closed by the std pipe wrapper class
 
@@ -139,14 +144,18 @@ public:
 	bool HasStdOutData() const { return !stdOutBytes.empty(); }
 	bool HasStdErrData() const { return !stdErrBytes.empty(); }
 
-	void FetchStdOutData(std::vector<char>& outData)
+	std::vector<char> FetchStdOutData()
 	{
-		outData.swap(stdOutBytes);
+		std::vector<char> ret;
+		ret.swap(stdOutBytes);
+		return ret;
 	}
 
-	void FetchStdErrData(std::vector<char>& errData)
+	std::vector<char> FetchStdErrData()
 	{
-		errData.swap(stdErrBytes);
+		std::vector<char> ret;
+		ret.swap(stdErrBytes);
+		return ret;
 	}
 
 private:
