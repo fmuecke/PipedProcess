@@ -8,12 +8,17 @@
 #include "windows.h"
 #include <vector>
 #include <algorithm>
+#include <functional>
 
 #ifdef _DEBUG
 #include <string>
 #include <system_error>
 #include <iostream>
 #endif
+
+using namespace std::placeholders;
+
+typedef std::function<BOOL(LPCSTR, LPSTR, LPSECURITY_ATTRIBUTES, LPSECURITY_ATTRIBUTES, BOOL, DWORD, LPVOID, LPCSTR, LPSTARTUPINFOA, LPPROCESS_INFORMATION)> createProcess_t;
 
 class PipedProcess
 {
@@ -31,12 +36,80 @@ public:
 
 	DWORD Run(const char* program, const char* arguments)
 	{
+		return Run(program, arguments, false);
+	}
+
+	DWORD Run(const char* program, const char* arguments, const bool hideWindow)
+	{
 		EmptyAbortEvent event;
-		return Run(program, arguments, event);
+		return Run(program, arguments, event, hideWindow);
+	}
+
+	DWORD RunAs(const HANDLE& token, const char* program, const char* arguments)
+	{
+		return RunAs(token, program, arguments, false);
+	}
+
+	DWORD RunAs(const HANDLE& token, const char* program, const char* arguments, const bool hideWindow)
+	{
+		EmptyAbortEvent event;
+		return RunAs(token, program, arguments, event, hideWindow);
 	}
 
 	template<class T>
 	DWORD Run(const char* program, const char* arguments, T& abortEvent)
+	{
+		return Run(program, arguments, abortEvent, false);
+	}
+
+	template<class T>
+	DWORD Run(const char* program, const char* arguments, T& abortEvent, const bool hideWindow)
+	{
+		return Run(program, arguments, abortEvent, hideWindow, CreateProcessA);
+	}
+
+	template<class T>
+	DWORD RunAs(const HANDLE& token, const char* program, const char* arguments, T& abortEvent)
+	{
+		return RunAs(token, program, arguments, abortEvent, false);
+	}
+
+	template<class T>
+	DWORD RunAs(const HANDLE& token, const char* program, const char* arguments, T& abortEvent, const bool hideWindow)
+	{
+		auto createProcess = std::bind(CreateProcessAsUserA, token, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10);
+		return Run(program, arguments, abortEvent, hideWindow, createProcess);
+	}
+
+	void SetStdInData(const char* pData, size_t len)
+	{
+		std::vector<char> tmp(pData, pData + len);
+		stdInBytes.swap(tmp);
+	}
+
+	bool HasStdOutData() const { return !stdOutBytes.empty(); }
+	bool HasStdErrData() const { return !stdErrBytes.empty(); }
+
+	std::vector<char> FetchStdOutData()
+	{
+		std::vector<char> ret;
+		ret.swap(stdOutBytes);
+		return ret;
+	}
+
+	std::vector<char> FetchStdErrData()
+	{
+		std::vector<char> ret;
+		ret.swap(stdErrBytes);
+		return ret;
+	}
+private:
+	std::vector<char> stdInBytes;
+	std::vector<char> stdOutBytes;
+	std::vector<char> stdErrBytes;
+
+	template<class T>
+	DWORD Run(const char* program, const char* arguments, T& abortEvent, const bool hideWindow, createProcess_t createProcess)
 	{
 		// arguments need to be in a non const array for the API call
 		auto len = strlen(arguments) + 1;
@@ -54,11 +127,14 @@ public:
 		startInfo.hStdError = pipes.err_write;
         startInfo.dwFlags |= STARTF_USESTDHANDLES;
 
+		if (hideWindow)
+			HideWindow(startInfo);
+
 		PROCESS_INFORMATION procInfo;
         ::SecureZeroMemory(&procInfo, sizeof(procInfo));
 
 		// Create the child process.
-		bool success = ::CreateProcessA(
+		bool success = createProcess(
 						   program,          // executable
 						   &args[0],      // argumenst (writable buffer)
 						   NULL,             // process security attributes
@@ -135,33 +211,11 @@ public:
 		return exitCode;
 	}
 
-	void SetStdInData(const char* pData, size_t len)
+	void HideWindow(STARTUPINFOA& startInfo)
 	{
-        std::vector<char> tmp(pData, pData + len);
-        stdInBytes.swap(tmp);
+		startInfo.dwFlags |= STARTF_USESHOWWINDOW;
+		startInfo.wShowWindow |= SW_HIDE;
 	}
-	
-	bool HasStdOutData() const { return !stdOutBytes.empty(); }
-	bool HasStdErrData() const { return !stdErrBytes.empty(); }
-
-	std::vector<char> FetchStdOutData()
-	{
-		std::vector<char> ret;
-		ret.swap(stdOutBytes);
-		return ret;
-	}
-
-	std::vector<char> FetchStdErrData()
-	{
-		std::vector<char> ret;
-		ret.swap(stdErrBytes);
-		return ret;
-	}
-
-private:
-	std::vector<char> stdInBytes;
-	std::vector<char> stdOutBytes;
-	std::vector<char> stdErrBytes;
 };
 
 
