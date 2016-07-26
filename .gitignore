@@ -36,3 +36,5 @@
 *.suo
 *.user
 *.nupkg
+*.opendb
+*.db
