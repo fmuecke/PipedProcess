@@ -60,7 +60,8 @@ public:
 	template<class T>
 	DWORD Run(const char* program, const char* arguments, T& abortEvent)
 	{
-		return Run(program, arguments, abortEvent, WindowMode::Visible);
+		auto userToken = nullptr;
+		return Run(program, arguments, abortEvent, WindowMode::Visible, userToken);
 	}
 
 	template<class T>
