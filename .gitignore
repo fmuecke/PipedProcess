@@ -38,3 +38,4 @@
 *.nupkg
 *.opendb
 *.db
+ipch/

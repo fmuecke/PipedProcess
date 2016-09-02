@@ -31,43 +31,35 @@ public:
 	~PipedProcess()
 	{}
 
-	DWORD Run(const char* program, const char* arguments)
-	{
-        EmptyAbortEvent abortEvent;
-        auto userToken = nullptr;
-        return Run(program, arguments, abortEvent, WindowMode::Visible, userToken);
-	}
+    void SetWindowMode(WindowMode mode)
+    {
+        windowMode = mode;
+    }
 
-	DWORD Run(const char* program, const char* arguments, WindowMode windowMode)
+	DWORD Run(const char* program, const char* arguments)
 	{
 		EmptyAbortEvent abortEvent;
         auto userToken = nullptr;
-		return Run(program, arguments, abortEvent, windowMode, userToken);
+		return Run(program, arguments, abortEvent, userToken);
 	}
 
 	DWORD RunAs(const HANDLE& token, const char* program, const char* arguments)
 	{
-        EmptyAbortEvent abortEvent;
-        return RunAs(token, program, arguments, abortEvent, WindowMode::Visible);
-	}
-
-	DWORD RunAs(const HANDLE& token, const char* program, const char* arguments, WindowMode windowMode)
-	{
 		EmptyAbortEvent abortEvent;
-		return Run(program, arguments, abortEvent, windowMode, &token);
+		return Run(program, arguments, abortEvent, &token);
 	}
 
 	template<class T>
 	DWORD Run(const char* program, const char* arguments, T& abortEvent)
 	{
 		auto userToken = nullptr;
-		return Run(program, arguments, abortEvent, WindowMode::Visible, userToken);
+		return Run(program, arguments, abortEvent, userToken);
 	}
 
 	template<class T>
-	DWORD RunAs(const HANDLE& token, const char* program, const char* arguments, T& abortEvent, WindowMode windowMode)
+	DWORD RunAs(const HANDLE& token, const char* program, const char* arguments, T& abortEvent)
 	{
-		return Run(program, arguments, abortEvent, windowMode, &token);
+		return Run(program, arguments, abortEvent, &token);
 	}
 
 	void SetStdInData(const char* pData, size_t len)
@@ -95,7 +87,7 @@ public:
 
 private:
     template<class T>
-    DWORD Run(const char* program, const char* arguments, T& abortEvent, WindowMode windowMode, HANDLE const* pUserAccessToken)
+    DWORD Run(const char* program, const char* arguments, T& abortEvent, HANDLE const* pUserAccessToken)
     {
         // arguments need to be in a non const array for the API call
         auto len = strlen(arguments) + 1;
@@ -215,7 +207,7 @@ private:
         return exitCode;
     }
 
-    void SetWindowFlags(STARTUPINFOA& startInfo, WindowMode mode)
+    static void SetWindowFlags(STARTUPINFOA& startInfo, WindowMode mode)
     {
         if (mode == WindowMode::Hidden)
         {
@@ -227,6 +219,8 @@ private:
     std::vector<char> stdInBytes;
 	std::vector<char> stdOutBytes;
 	std::vector<char> stdErrBytes;
+
+    WindowMode windowMode = { WindowMode::Hidden };
 };
 
 
