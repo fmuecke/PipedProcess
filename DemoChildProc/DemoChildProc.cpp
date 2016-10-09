@@ -72,9 +72,16 @@ int main()
 	{
 		// do some program logic here...
 		cerr << "... doing program logic ..." << endl;
-		
+           		
 		cout << "nonsens" << flush;
-		Sleep(5000);
+        Sleep(50);
+        cout << "newline" << endl;
+        cout << "newline2" << endl;
+        Sleep(50);
+        cerr << "errline" << endl;
+        cout << "newline3" << endl;
+        cerr << "errline2" << endl;
+		Sleep(3000);
 		
 		return WriteOurput(resultData);
 	}

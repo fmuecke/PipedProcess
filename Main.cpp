@@ -15,13 +15,11 @@ int main(int argc, char *argv[])
 		buffer = proc.FetchStdOutData();
 		cout << buffer.size() << " bytes received" << endl;
 	}
-	else
+	
+    if (proc.HasStdErrData())
 	{
-		if (proc.HasStdErrData())
-		{
-			buffer = proc.FetchStdErrData();
-			cerr << &buffer[0] << endl;
-		}
+		buffer = proc.FetchStdErrData();
+		cerr << string(&buffer[0], buffer.size()).c_str() << endl;
 	}
 
     return errorCode;
