@@ -13,6 +13,7 @@
 #include <string>
 #include <system_error>
 #include <iostream>
+#include <future>
 #endif
 
 class PipedProcess
@@ -87,7 +88,7 @@ public:
 
 private:
     template<class T>
-    DWORD Run(const char* program, const char* arguments, T& abortEvent, HANDLE const* pUserAccessToken)
+    DWORD Run(const char* program, const char* arguments, T& abortEvent, HANDLE const* pUserAccessToken) noexcept
     {
         // arguments need to be in a non const array for the API call
         auto len = strlen(arguments) + 1;
@@ -100,9 +101,9 @@ private:
         STARTUPINFOA startInfo;
         ::SecureZeroMemory(&startInfo, sizeof(startInfo));
         startInfo.cb = sizeof(startInfo);
-        startInfo.hStdInput = stdInBytes.empty() ? 0 : pipes.in_read;
-        startInfo.hStdOutput = pipes.out_write;
-        startInfo.hStdError = pipes.err_write;
+        startInfo.hStdInput = stdInBytes.empty() ? 0 : pipes.stdin_read;
+        startInfo.hStdOutput = pipes.stdout_write;
+        startInfo.hStdError = pipes.stderr_write;
         startInfo.dwFlags |= STARTF_USESTDHANDLES;
 
         SetWindowFlags(startInfo, windowMode);
@@ -146,66 +147,82 @@ private:
         if (!success)
         {
             exitCode = ::GetLastError();
-#ifdef _DEBUG
             std::error_code code(exitCode, std::system_category());
-            std::cerr << "error: unable to create process '"
-                << program
-                << "': " << code.message() << std::endl;
-#endif
+            auto msg = std::string("Error creating process '") + program + "': " + code.message();
+            stdErrBytes = { msg.data(), msg.data() + msg.size() };
+            return exitCode;
         }
         else
         {
-            if (!stdInBytes.empty())
+            StdPipes::Close(pipes.stdin_read);
+			StdPipes::Close(pipes.stdout_write);
+			StdPipes::Close(pipes.stderr_write);
+			
+			if (!stdInBytes.empty())
             {
-                DWORD bytesWritten(0);
-                if (!::WriteFile(pipes.in_write, &stdInBytes[0], (DWORD)stdInBytes.size(), &bytesWritten, NULL))
+                try
                 {
-                    exitCode = ::GetLastError();
-#ifdef _DEBUG
-                    std::error_code code(exitCode, std::system_category());
-                    std::cerr << "error: unable to write input stream: "
-                        << code.message() << std::endl;
-#endif
+                    StdPipes::Write(pipes.stdin_write, stdInBytes.data(), stdInBytes.size());
                 }
-                else
+                catch (std::system_error &e)
                 {
-                    pipes.Close(pipes.in_write);
-                    pipes.Close(pipes.in_read);
+                    auto msg = "Error writing to child's stdin stream: " + e.code().message();
+                    stdErrBytes = { msg.data(), msg.data() + msg.size() };
+                    return e.code().value();
                 }
             }
 
-            pipes.CloseWriteHandles();
+            StdPipes::Close(pipes.stdin_write);
+            stdInBytes.clear();
+            
+            // read asynchronously from childs stdout and stderr
+            auto stdOutReader = std::async(std::launch::async, StdPipes::Read, pipes.stdout_read);
+            auto stdErrReader = std::async(std::launch::async, StdPipes::Read, pipes.stderr_read);
 
+            // check for abort signal or pipe read errors while process is still running
             while (WAIT_TIMEOUT == ::WaitForSingleObject(procInfo.hProcess, 50))
             {
-                if (!pipes.HasData(pipes.out_read))
+                // If the reader already has a result there must have been an exception --> stop execution
+                if (stdOutReader.wait_for(std::chrono::seconds(0)) == std::future_status::ready || 
+                    stdErrReader.wait_for(std::chrono::seconds(0)) == std::future_status::ready || 
+                    abortEvent.IsSet())
                 {
-                    if (abortEvent.IsSet())
-                    {
-                        ::TerminateProcess(procInfo.hProcess, HRESULT_CODE(E_ABORT));
-                        break;
-                    }
-                    continue;
+                    ::TerminateProcess(procInfo.hProcess, HRESULT_CODE(E_ABORT));
+                    break;
                 }
-
-                pipes.Read(pipes.out_read, stdOutBytes, StdPipes::ReadMode::append);
-                pipes.Read(pipes.err_read, stdErrBytes, StdPipes::ReadMode::append);
             }
-
-            pipes.Read(pipes.out_read, stdOutBytes, StdPipes::ReadMode::append);
-            pipes.Read(pipes.err_read, stdErrBytes, StdPipes::ReadMode::append);
 
             ::GetExitCodeProcess(procInfo.hProcess, &exitCode);
             ::CloseHandle(procInfo.hProcess);
             ::CloseHandle(procInfo.hThread);
+
+            try
+            {
+                stdOutBytes = stdOutReader.get();
+            }
+            catch (std::system_error& e)
+            {
+                // exception during read operation will be written to stdERR
+                auto msg = "Error reading from child's stdout stream: " + e.code().message();
+                stdErrBytes = { msg.data(), msg.data() + msg.size() };
+                return e.code().value();
+            }
+
+            try
+            {
+                stdErrBytes = stdErrReader.get();
+            }
+            catch (std::system_error& e)
+            {
+                auto msg = "Error reading from child's stderr stream: " + e.code().message();
+                stdErrBytes = { msg.data(), msg.data() + msg.size() };
+                                return e.code().value();
+            }
         }
 
-        stdInBytes.clear();
-
-        // note: all pipe handles will be closed by the std pipe wrapper class
-
         return exitCode;
-    }
+        
+    }  // note: all pipe handles will be closed by the std pipe wrapper class
 
     static void SetWindowFlags(STARTUPINFOA& startInfo, WindowMode mode)
     {

@@ -14,23 +14,13 @@ struct StdPipes
 
 	~StdPipes()
 	{
-		CloseWriteHandles();
-		CloseReadHandles();
-	}
-
-	void CloseReadHandles()
-	{
-		Close(in_read);
-		Close(out_read);
-		Close(err_read);
-	}
-
-	void CloseWriteHandles()
-	{
-		Close(in_write);
-		Close(out_write);
-		Close(err_write);
-	}
+        Close(stdin_write);
+        Close(stdout_write);
+        Close(stderr_write);
+        Close(stdin_read);
+        Close(stdout_read);
+        Close(stderr_read);
+    }
 
 	bool Create()
 	{
@@ -38,17 +28,17 @@ struct StdPipes
 		m_sa.bInheritHandle = true;  // pipe handles should be inherited
 		m_sa.lpSecurityDescriptor = nullptr;
 
-		if (!::CreatePipe(&out_read, &out_write, &m_sa, 0) ||
-			!::CreatePipe(&err_read, &err_write, &m_sa, 0) ||
-			!::CreatePipe(&in_read, &in_write, &m_sa, 0))
+		if (!::CreatePipe(&stdout_read, &stdout_write, &m_sa, 0) ||
+			!::CreatePipe(&stderr_read, &stderr_write, &m_sa, 0) ||
+			!::CreatePipe(&stdin_read, &stdin_write, &m_sa, 0))
 		{
 			return false;
 		}
 
 		// read (out/err) and write (in) should not be inheritable
-		if (!::SetHandleInformation(out_read, HANDLE_FLAG_INHERIT, 0) ||
-			!::SetHandleInformation(err_read, HANDLE_FLAG_INHERIT, 0) ||
-			!::SetHandleInformation(in_write, HANDLE_FLAG_INHERIT, 0))
+		if (!::SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0) ||
+			!::SetHandleInformation(stderr_read, HANDLE_FLAG_INHERIT, 0) ||
+			!::SetHandleInformation(stdin_write, HANDLE_FLAG_INHERIT, 0))
 		{
 			return false;
 		}
@@ -56,7 +46,7 @@ struct StdPipes
 		return true;
 	}
 
-	void Close(HANDLE& h)
+	static void Close(HANDLE& h)
 	{
 		if (h != INVALID_HANDLE_VALUE)
 		{
@@ -67,18 +57,17 @@ struct StdPipes
 
     static bool HasData(HANDLE hPipe)
     {
-        std::array<char, 256> buffer;
+        std::array<char, 256> buffer = {};
         DWORD bytesRead = 0;
         DWORD bytesAvailable = 0;
         ::PeekNamedPipe(hPipe, &buffer[0], static_cast<DWORD>(buffer.size()), &bytesRead, &bytesAvailable, NULL);
         return bytesAvailable > 0 || bytesRead > 0;
     }
-
-	enum class ReadMode { append, truncate };
-	static bool Read(HANDLE hPipe, std::vector<char>& result, ReadMode mode)
+	
+	static std::vector<char> Read(HANDLE pipe)
 	{
-		std::array<char, 4096> buffer;
-		std::vector<char> _result;
+		std::array<char, 4096> buffer = {};
+		std::vector<char> result;
 
 		using std::begin;
 		using std::end;
@@ -86,43 +75,44 @@ struct StdPipes
 		for (;;)
 		{
 			DWORD bytesRead = 0;
-			bool success = ::ReadFile(hPipe, &buffer[0], static_cast<DWORD>(buffer.size()), &bytesRead, NULL) != 0;
+			bool success = ::ReadFile(pipe, &buffer[0], static_cast<DWORD>(buffer.size()), &bytesRead, NULL) != 0;
 			if (!success || bytesRead == 0)
 			{
-				if (_result.empty())
+				if (result.empty())
 				{
 					//std::cerr << "error reading from pipe: code " << GetLastError() << std::endl;
-					return false;
+                    auto err = ::GetLastError();
+                    throw std::system_error(std::error_code(err, std::system_category()));
 				}
 
 				break;
 			}
 
-			std::move(begin(buffer), begin(buffer) + bytesRead, std::back_inserter(_result));
+			std::move(begin(buffer), begin(buffer) + bytesRead, std::back_inserter(result));
 		}
 
-		if (mode == ReadMode::append)
-		{
-			result.reserve(result.size() + _result.size());
-			std::move(begin(_result), end(_result), std::back_inserter(result));
-		}
-		else
-		{
-			result.swap(_result);
-		}
-
-		return true;
+	    return result;
 	}
+
+    static void Write(HANDLE pipe, const char* pBytes, int len)
+    {
+        DWORD bytesWritten = 0;
+        if (!::WriteFile(pipe, pBytes, len, &bytesWritten, NULL))
+        {
+            auto err = ::GetLastError();
+            throw std::system_error(std::error_code(err, std::system_category()));
+        }
+    }
 
 	StdPipes(const StdPipes&) = delete;
 	StdPipes& operator=(const StdPipes&) = delete;
 
-	HANDLE err_read = INVALID_HANDLE_VALUE;
-	HANDLE err_write = INVALID_HANDLE_VALUE;
-	HANDLE out_read = INVALID_HANDLE_VALUE;
-	HANDLE out_write = INVALID_HANDLE_VALUE;
-	HANDLE in_read = INVALID_HANDLE_VALUE;
-	HANDLE in_write = INVALID_HANDLE_VALUE;
+	HANDLE stderr_read { INVALID_HANDLE_VALUE };
+	HANDLE stderr_write { INVALID_HANDLE_VALUE };
+	HANDLE stdout_read { INVALID_HANDLE_VALUE };
+	HANDLE stdout_write { INVALID_HANDLE_VALUE };
+	HANDLE stdin_read { INVALID_HANDLE_VALUE };
+	HANDLE stdin_write { INVALID_HANDLE_VALUE };
 
 private:
 	SECURITY_ATTRIBUTES m_sa;
