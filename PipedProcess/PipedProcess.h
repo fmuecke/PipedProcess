@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "StdPipes.h"
+#include "StdPipe.h"
 #include "windows.h"
 #include <vector>
 #include <algorithm>
@@ -95,133 +95,147 @@ private:
         std::vector<char> args(static_cast<int>(len), 0);
         std::copy(arguments, arguments + len, stdext::checked_array_iterator<char*>(&args[0], len));
 
-        StdPipes pipes;
-        pipes.Create();
-
-        STARTUPINFOA startInfo;
-        ::SecureZeroMemory(&startInfo, sizeof(startInfo));
-        startInfo.cb = sizeof(startInfo);
-        startInfo.hStdInput = stdInBytes.empty() ? 0 : pipes.stdin_read;
-        startInfo.hStdOutput = pipes.stdout_write;
-        startInfo.hStdError = pipes.stderr_write;
-        startInfo.dwFlags |= STARTF_USESTDHANDLES;
-
-        SetWindowFlags(startInfo, windowMode);
-
-        PROCESS_INFORMATION procInfo;
-        ::SecureZeroMemory(&procInfo, sizeof(procInfo));
-
-        // Create the child process.
-        bool success = false;
-        if (pUserAccessToken)
+        try
         {
-            success = ::CreateProcessAsUserA(
-                *pUserAccessToken,
-                program,          // executable
-                &args[0],         // argumenst (writable buffer)
-                NULL,             // process security attributes
-                NULL,             // primary thread security attributes
-                TRUE,             // handles are inherited
-                0,                // creation flags
-                NULL,             // use parent's environment
-                NULL,             // use parent's current directory
-                &startInfo,       // STARTUPINFO
-                &procInfo) != 0;  // receives PROCESS_INFORMATION
-        }
-        else
-        {
-            success = ::CreateProcessA(
-                program,          // executable
-                &args[0],         // argumenst (writable buffer)
-                NULL,             // process security attributes
-                NULL,             // primary thread security attributes
-                TRUE,             // handles are inherited
-                0,                // creation flags
-                NULL,             // use parent's environment
-                NULL,             // use parent's current directory
-                &startInfo,       // STARTUPINFO
-                &procInfo) != 0;  // receives PROCESS_INFORMATION
-        }
+            StdPipe stdInPipe;
+            StdPipe stdOutPipe;
+            StdPipe stdErrPipe;
+        
+            // read (out/err) and write (in) should not be inheritable
+            ::SetHandleInformation(stdOutPipe.GetReadHandle(), HANDLE_FLAG_INHERIT, 0);
+            ::SetHandleInformation(stdErrPipe.GetReadHandle(), HANDLE_FLAG_INHERIT, 0);
+            ::SetHandleInformation(stdInPipe.GetWriteHandle(), HANDLE_FLAG_INHERIT, 0);
 
-        DWORD exitCode = ERROR_INVALID_FUNCTION;
-        if (!success)
-        {
-            exitCode = ::GetLastError();
-            std::error_code code(exitCode, std::system_category());
-            auto msg = std::string("Error creating process '") + program + "': " + code.message();
-            stdErrBytes = { msg.data(), msg.data() + msg.size() };
-            return exitCode;
-        }
-        else
-        {
-            StdPipes::Close(pipes.stdin_read);
-			StdPipes::Close(pipes.stdout_write);
-			StdPipes::Close(pipes.stderr_write);
-			
-			if (!stdInBytes.empty())
+            STARTUPINFOA startInfo;
+            ::SecureZeroMemory(&startInfo, sizeof(startInfo));
+            startInfo.cb = sizeof(startInfo);
+            startInfo.hStdInput = stdInBytes.empty() ? 0 : stdInPipe.GetReadHandle();
+            startInfo.hStdOutput = stdOutPipe.GetWriteHandle();
+            startInfo.hStdError = stdErrPipe.GetWriteHandle();
+            startInfo.dwFlags |= STARTF_USESTDHANDLES;
+
+            SetWindowFlags(startInfo, windowMode);
+
+            PROCESS_INFORMATION procInfo;
+            ::SecureZeroMemory(&procInfo, sizeof(procInfo));
+
+            // Create the child process.
+            bool success = false;
+            if (pUserAccessToken)
             {
+                success = ::CreateProcessAsUserA(
+                    *pUserAccessToken,
+                    program,          // executable
+                    &args[0],         // argumenst (writable buffer)
+                    NULL,             // process security attributes
+                    NULL,             // primary thread security attributes
+                    TRUE,             // handles are inherited
+                    0,                // creation flags
+                    NULL,             // use parent's environment
+                    NULL,             // use parent's current directory
+                    &startInfo,       // STARTUPINFO
+                    &procInfo) != 0;  // receives PROCESS_INFORMATION
+            }
+            else
+            {
+                success = ::CreateProcessA(
+                    program,          // executable
+                    &args[0],         // argumenst (writable buffer)
+                    NULL,             // process security attributes
+                    NULL,             // primary thread security attributes
+                    TRUE,             // handles are inherited
+                    0,                // creation flags
+                    NULL,             // use parent's environment
+                    NULL,             // use parent's current directory
+                    &startInfo,       // STARTUPINFO
+                    &procInfo) != 0;  // receives PROCESS_INFORMATION
+            }
+
+            DWORD exitCode = ERROR_INVALID_FUNCTION;
+            if (!success)
+            {
+                exitCode = ::GetLastError();
+                std::error_code code(exitCode, std::system_category());
+                auto msg = std::string("Error creating process '") + program + "': " + code.message();
+                stdErrBytes = { msg.data(), msg.data() + msg.size() };
+                return exitCode;
+            }
+            else
+            {
+                stdInPipe.CloseReadHandle();
+			    stdOutPipe.CloseWriteHandle();
+                stdErrPipe.CloseWriteHandle();
+			
+			    if (!stdInBytes.empty())
+                {
+                    try
+                    {
+                        stdInPipe.Write(stdInBytes.data(), stdInBytes.size());
+                    }
+                    catch (std::system_error &e)
+                    {
+                        auto msg = "Error writing to child's stdin stream: " + e.code().message();
+                        stdErrBytes = { msg.data(), msg.data() + msg.size() };
+                        return e.code().value();
+                    }
+                }
+
+                stdInPipe.CloseWriteHandle();
+                stdInBytes.clear();
+            
+                // read asynchronously from childs stdout and stderr
+                auto stdOutReader = std::async(std::launch::async, &StdPipe::Read, stdOutPipe);
+                auto stdErrReader = std::async(std::launch::async, &StdPipe::Read, stdErrPipe);
+
+                // check for abort signal or pipe read errors while process is still running
+                while (WAIT_TIMEOUT == ::WaitForSingleObject(procInfo.hProcess, 50))
+                {
+                    // If the reader already has a result there must have been an exception --> stop execution
+                    if (stdOutReader.wait_for(std::chrono::seconds(0)) == std::future_status::ready || 
+                        stdErrReader.wait_for(std::chrono::seconds(0)) == std::future_status::ready || 
+                        abortEvent.IsSet())
+                    {
+                        ::TerminateProcess(procInfo.hProcess, HRESULT_CODE(E_ABORT));
+                        break;
+                    }
+                }
+
+                ::GetExitCodeProcess(procInfo.hProcess, &exitCode);
+                ::CloseHandle(procInfo.hProcess);
+                ::CloseHandle(procInfo.hThread);
+
                 try
                 {
-                    StdPipes::Write(pipes.stdin_write, stdInBytes.data(), stdInBytes.size());
+                    stdOutBytes = stdOutReader.get();
                 }
-                catch (std::system_error &e)
+                catch (std::system_error& e)
                 {
-                    auto msg = "Error writing to child's stdin stream: " + e.code().message();
+                    // exception during read operation will be written to stdERR
+                    auto msg = "Error reading from child's stdout stream: " + e.code().message();
                     stdErrBytes = { msg.data(), msg.data() + msg.size() };
                     return e.code().value();
                 }
-            }
 
-            StdPipes::Close(pipes.stdin_write);
-            stdInBytes.clear();
-            
-            // read asynchronously from childs stdout and stderr
-            auto stdOutReader = std::async(std::launch::async, StdPipes::Read, pipes.stdout_read);
-            auto stdErrReader = std::async(std::launch::async, StdPipes::Read, pipes.stderr_read);
-
-            // check for abort signal or pipe read errors while process is still running
-            while (WAIT_TIMEOUT == ::WaitForSingleObject(procInfo.hProcess, 50))
-            {
-                // If the reader already has a result there must have been an exception --> stop execution
-                if (stdOutReader.wait_for(std::chrono::seconds(0)) == std::future_status::ready || 
-                    stdErrReader.wait_for(std::chrono::seconds(0)) == std::future_status::ready || 
-                    abortEvent.IsSet())
+                try
                 {
-                    ::TerminateProcess(procInfo.hProcess, HRESULT_CODE(E_ABORT));
-                    break;
+                    stdErrBytes = stdErrReader.get();
+                }
+                catch (std::system_error& e)
+                {
+                    auto msg = "Error reading from child's stderr stream: " + e.code().message();
+                    stdErrBytes = { msg.data(), msg.data() + msg.size() };
+                                    return e.code().value();
                 }
             }
 
-            ::GetExitCodeProcess(procInfo.hProcess, &exitCode);
-            ::CloseHandle(procInfo.hProcess);
-            ::CloseHandle(procInfo.hThread);
-
-            try
-            {
-                stdOutBytes = stdOutReader.get();
-            }
-            catch (std::system_error& e)
-            {
-                // exception during read operation will be written to stdERR
-                auto msg = "Error reading from child's stdout stream: " + e.code().message();
-                stdErrBytes = { msg.data(), msg.data() + msg.size() };
-                return e.code().value();
-            }
-
-            try
-            {
-                stdErrBytes = stdErrReader.get();
-            }
-            catch (std::system_error& e)
-            {
-                auto msg = "Error reading from child's stderr stream: " + e.code().message();
-                stdErrBytes = { msg.data(), msg.data() + msg.size() };
-                                return e.code().value();
-            }
+            return exitCode;
         }
-
-        return exitCode;
-        
+        catch (std::system_error& e)
+        {
+            auto msg = "Error creating std io pipes: " + e.code().message();
+            stdErrBytes = { msg.data(), msg.data() + msg.size() };
+            return e.code().value();
+        }
     }  // note: all pipe handles will be closed by the std pipe wrapper class
 
     static void SetWindowFlags(STARTUPINFOA& startInfo, WindowMode mode)

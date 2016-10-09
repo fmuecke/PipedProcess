@@ -80,7 +80,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="PipedProcess\PipedProcess.h" />
-    <ClInclude Include="PipedProcess/StdPipes.h" />
+    <ClInclude Include="PipedProcess\StdPipe.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
