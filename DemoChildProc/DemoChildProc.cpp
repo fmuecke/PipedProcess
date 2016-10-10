@@ -8,6 +8,7 @@
 #include <iostream>
 #include <fstream>
 #include <Windows.h>
+#include "..\PipedProcess\ChildProc.h"
 
 using namespace std;
 
@@ -15,7 +16,7 @@ static char const * const fileName = "cin.out";
 
 static int ReadInput(vector<char>& resultData)
 {
-	if (cin.good())
+    if (cin.good())
 	{
 		if (_setmode(_fileno(stdin), _O_BINARY) == -1)
 		{
@@ -65,10 +66,13 @@ static int WriteOurput(vector<char> const& resultData)
 
 int main()
 {
-	vector<char> resultData;
+    ChildProc proc;
+    auto msg = proc.ReadMessageFromParent();
+    
+    vector<char> resultData;
 
-	auto retVal = ReadInput(resultData);
-	if (0 == retVal)
+	//auto retVal = ReadInput(resultData);
+	//if (0 == retVal)
 	{
 		// do some program logic here...
 		cerr << "... doing program logic ..." << endl;
@@ -86,6 +90,6 @@ int main()
 		return WriteOurput(resultData);
 	}
 
-	return retVal;
+	return 0; //retVal;
 }
 

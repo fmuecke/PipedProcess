@@ -6,6 +6,7 @@
 
 #include "StdPipe.h"
 #include "windows.h"
+#include "ChildProc.h"
 #include <vector>
 #include <algorithm>
 
@@ -170,7 +171,8 @@ private:
                 {
                     try
                     {
-                        stdInPipe.Write(stdInBytes.data(), stdInBytes.size());
+                        ChildProc::WriteMessage(stdInPipe.GetWriteHandle(), std::string{stdInBytes.data(), stdInBytes.data() + stdInBytes.size()});
+                        //stdInPipe.Write(stdInBytes.data(), stdInBytes.size());
                     }
                     catch (std::system_error &e)
                     {
