@@ -29,15 +29,8 @@ struct StdPipe
         CloseReadHandle();
     }
 
-	void CloseReadHandle()
-	{
-		Close(_readHandle);
-	}
-
-	void CloseWriteHandle()
-	{
-		Close(_writeHandle);
-	}
+	void CloseReadHandle()  { Close(_readHandle); }
+	void CloseWriteHandle() { Close(_writeHandle); }
 
     bool HasData() const
     {
@@ -48,7 +41,7 @@ struct StdPipe
         return bytesAvailable > 0 || bytesRead > 0;
     }
 	
-	std::vector<char> Read() const
+	std::vector<char> Read()
 	{
 		std::array<char, 4096> buffer = {};
 		std::vector<char> result;
@@ -105,5 +98,5 @@ private:
 
 	HANDLE _readHandle { INVALID_HANDLE_VALUE };
 	HANDLE _writeHandle { INVALID_HANDLE_VALUE };
-	SECURITY_ATTRIBUTES m_sa;
+	SECURITY_ATTRIBUTES m_sa {0};
 };

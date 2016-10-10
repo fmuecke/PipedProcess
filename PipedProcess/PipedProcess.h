@@ -184,8 +184,9 @@ private:
                 stdInBytes.clear();
             
                 // read asynchronously from childs stdout and stderr
-                auto stdOutReader = std::async(std::launch::async, &StdPipe::Read, stdOutPipe);
-                auto stdErrReader = std::async(std::launch::async, &StdPipe::Read, stdErrPipe);
+                // (unfortunately calling with ptr to member did not work...)
+                auto stdOutReader = std::async(std::launch::async, [&stdOutPipe] { return stdOutPipe.Read(); } );
+                auto stdErrReader = std::async(std::launch::async, [&stdErrPipe] { return stdErrPipe.Read(); } );
 
                 // check for abort signal or pipe read errors while process is still running
                 while (WAIT_TIMEOUT == ::WaitForSingleObject(procInfo.hProcess, 50))
