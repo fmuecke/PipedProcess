@@ -8,6 +8,7 @@
 #include "windows.h"
 #include <vector>
 #include <algorithm>
+#include <future>
 
 #ifdef _DEBUG
 #include <string>
@@ -88,7 +89,7 @@ public:
 
 private:
     template<class T>
-    DWORD Run(const char* program, const char* arguments, T& abortEvent, HANDLE const* pUserAccessToken) noexcept
+    DWORD Run(const char* program, const char* arguments, T& abortEvent, HANDLE const* pUserAccessToken)
     {
         // arguments need to be in a non const array for the API call
         auto len = strlen(arguments) + 1;
@@ -97,7 +98,10 @@ private:
 
         try
         {
-            StdPipe stdInPipe;
+            // Note: Raymond Chen ("The Old New Thing") has some thoughtful insights about pipes:
+			// "Be careful when redirecting both a process’s stdin and stdout to pipes, for you can easily deadlock"
+			// https://blogs.msdn.microsoft.com/oldnewthing/20110707-00/?p=10223
+			StdPipe stdInPipe;
             StdPipe stdOutPipe;
             StdPipe stdErrPipe;
         
@@ -170,7 +174,7 @@ private:
                 {
                     try
                     {
-                        stdInPipe.Write(stdInBytes.data(), stdInBytes.size());
+                        stdInPipe.Write(stdInBytes.data(), static_cast<DWORD>(stdInBytes.size()));  // cast needed for 64-bit!
                     }
                     catch (std::system_error &e)
                     {

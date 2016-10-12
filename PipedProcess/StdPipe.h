@@ -98,5 +98,9 @@ private:
 
 	HANDLE _readHandle { INVALID_HANDLE_VALUE };
 	HANDLE _writeHandle { INVALID_HANDLE_VALUE };
+#if _MSC_VER > 1800 // VS 2015 and above	
 	SECURITY_ATTRIBUTES m_sa {0};
+#else 
+	SECURITY_ATTRIBUTES m_sa;
+#endif
 };
