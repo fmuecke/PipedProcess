@@ -5,8 +5,8 @@
 #pragma once
 
 #include <Windows.h>
-#include <vector>
 #include <array>
+#include <string>
 
 struct StdPipe
 {
@@ -41,10 +41,10 @@ struct StdPipe
         return bytesAvailable > 0 || bytesRead > 0;
     }
 	
-	std::vector<char> Read()
+	std::string Read()
 	{
 		std::array<char, 4096> buffer = {};
-		std::vector<char> result;
+		std::string result;
 
 		using std::begin;
 		using std::end;

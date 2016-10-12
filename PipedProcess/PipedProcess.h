@@ -6,15 +6,14 @@
 
 #include "StdPipe.h"
 #include "windows.h"
-#include <vector>
 #include <algorithm>
 #include <future>
+#include <string>
+#include <vector>
 
 #ifdef _DEBUG
-#include <string>
 #include <system_error>
 #include <iostream>
-#include <future>
 #endif
 
 class PipedProcess
@@ -66,23 +65,23 @@ public:
 
 	void SetStdInData(const char* pData, size_t len)
 	{
-		std::vector<char> tmp(pData, pData + len);
+		std::string tmp(pData, pData + len);
 		stdInBytes.swap(tmp);
 	}
 
 	bool HasStdOutData() const { return !stdOutBytes.empty(); }
 	bool HasStdErrData() const { return !stdErrBytes.empty(); }
 
-	std::vector<char> FetchStdOutData()
+	std::string FetchStdOutData()
 	{
-		std::vector<char> ret;
+		std::string ret;
 		ret.swap(stdOutBytes);
 		return ret;
 	}
 
-	std::vector<char> FetchStdErrData()
+	std::string FetchStdErrData()
 	{
-		std::vector<char> ret;
+		std::string ret;
 		ret.swap(stdErrBytes);
 		return ret;
 	}
@@ -92,7 +91,7 @@ private:
     DWORD Run(const char* program, const char* arguments, T& abortEvent, HANDLE const* pUserAccessToken)
     {
         // arguments need to be in a non const array for the API call
-        auto len = strlen(arguments) + 1;
+        const auto len = strlen(arguments) + 1;
         std::vector<char> args(static_cast<int>(len), 0);
         std::copy(arguments, arguments + len, stdext::checked_array_iterator<char*>(&args[0], len));
 
@@ -252,9 +251,9 @@ private:
         }
     }
 
-    std::vector<char> stdInBytes;
-	std::vector<char> stdOutBytes;
-	std::vector<char> stdErrBytes;
+    std::string stdInBytes;
+	std::string stdOutBytes;
+	std::string stdErrBytes;
 
     WindowMode windowMode = { WindowMode::Hidden };
 };
