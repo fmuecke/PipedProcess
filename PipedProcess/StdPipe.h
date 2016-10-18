@@ -7,6 +7,7 @@
 #include <Windows.h>
 #include <array>
 #include <string>
+#include <system_error>
 
 struct StdPipe
 {
@@ -19,7 +20,7 @@ struct StdPipe
         if (!::CreatePipe(&_readHandle, &_writeHandle, &m_sa, 0))
         {
             auto err = ::GetLastError();
-            throw std::error_code(err, std::system_category());
+            throw std::system_error(err, std::system_category());
         }
     }
 
@@ -55,14 +56,18 @@ struct StdPipe
 			bool success = ::ReadFile(_readHandle, &buffer[0], static_cast<DWORD>(buffer.size()), &bytesRead, NULL) != 0;
 			if (!success || bytesRead == 0)
 			{
-				if (result.empty())
-				{
-                    auto err = ::GetLastError();
-                    throw std::system_error(std::error_code(err, std::system_category()));
+                auto err = ::GetLastError();
+                if (err != ERROR_BROKEN_PIPE)
+                {
+                    throw std::system_error(err, std::system_category());
 				}
 
 				break;
 			}
+            else if (bytesRead == 0)
+            {
+                break;
+            }
 
 			std::move(begin(buffer), begin(buffer) + bytesRead, std::back_inserter(result));
 		}
@@ -76,7 +81,7 @@ struct StdPipe
         if (!::WriteFile(_writeHandle, pBytes, len, &bytesWritten, NULL))
         {
             auto err = ::GetLastError();
-            throw std::system_error(std::error_code(err, std::system_category()));
+            throw std::system_error(err, std::system_category());
         }
     }
 
@@ -87,7 +92,7 @@ struct StdPipe
 	StdPipe& operator=(const StdPipe&) = delete;
 
 private:
-	void Close(HANDLE& h)
+    void Close(HANDLE& h)
 	{
 		if (h != INVALID_HANDLE_VALUE)
 		{
