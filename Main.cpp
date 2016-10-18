@@ -9,6 +9,11 @@ int main(int argc, char *argv[])
 {
 	string buffer(1000000, 'Ö');
     PipedProcess proc;
+
+    assert(proc.Run("c:\\windows\\system32\\cmd.exe", "/c exit 0") == NO_ERROR);
+    assert(!proc.HasStdErrData());
+    assert(!proc.HasStdOutData());
+
 	proc.SetStdInData(&buffer[0], buffer.size());
 	DWORD errorCode = proc.Run("DemoChildProc.exe", "");
 
