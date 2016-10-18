@@ -54,7 +54,7 @@ struct StdPipe
 		{
 			DWORD bytesRead = 0;
 			bool success = ::ReadFile(_readHandle, &buffer[0], static_cast<DWORD>(buffer.size()), &bytesRead, NULL) != 0;
-			if (!success || bytesRead == 0)
+			if (!success)
 			{
                 auto err = ::GetLastError();
                 if (err != ERROR_BROKEN_PIPE)
