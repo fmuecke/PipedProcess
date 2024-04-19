@@ -8,6 +8,7 @@
 #include <array>
 #include <string>
 #include <system_error>
+#include <iterator>
 
 struct StdPipe
 {
