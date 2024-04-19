@@ -93,7 +93,7 @@ private:
         // arguments need to be in a non const array for the API call
         const auto len = strlen(arguments) + 1;
         std::vector<char> args(static_cast<int>(len), 0);
-        std::copy(arguments, arguments + len, stdext::checked_array_iterator<char*>(&args[0], len));
+        std::copy(arguments, arguments + len, args.begin());
 
         try
         {

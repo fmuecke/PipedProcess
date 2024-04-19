@@ -5,7 +5,7 @@
 
 using namespace std;
 
-int main(int argc, char *argv[])
+int main()
 {
 	string buffer(1000000, 'Ö');
     PipedProcess proc;
