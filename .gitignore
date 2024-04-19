@@ -41,3 +41,4 @@
 ipch/
 /Debug/main.nativecodeanalysis.xml
 /bin/PipedProcess.exe.lastcodeanalysissucceeded
+.vs/
