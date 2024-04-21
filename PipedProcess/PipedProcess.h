@@ -109,21 +109,19 @@ private:
             ::SetHandleInformation(stdErrPipe.GetReadHandle(), HANDLE_FLAG_INHERIT, 0);
             ::SetHandleInformation(stdInPipe.GetWriteHandle(), HANDLE_FLAG_INHERIT, 0);
 
-            STARTUPINFOA startInfo;
-            ::SecureZeroMemory(&startInfo, sizeof(startInfo));
+            STARTUPINFOA startInfo{ 0 };
             startInfo.cb = sizeof(startInfo);
             startInfo.hStdInput = stdInBytes.empty() ? 0 : stdInPipe.GetReadHandle();
             startInfo.hStdOutput = stdOutPipe.GetWriteHandle();
             startInfo.hStdError = stdErrPipe.GetWriteHandle();
-            startInfo.dwFlags |= STARTF_USESTDHANDLES;
+            startInfo.dwFlags |= STARTF_USESTDHANDLES; // use the handles specified in hStdInput, hStdOutput, and hStdError
 
             SetWindowFlags(startInfo, windowMode);
 
-            PROCESS_INFORMATION procInfo;
-            ::SecureZeroMemory(&procInfo, sizeof(procInfo));
+            PROCESS_INFORMATION procInfo = {0};
 
-            // Create the child process.
-            bool success = false;
+            // Create the child process
+            bool success{ false };
             if (pUserAccessToken)
             {
                 success = ::CreateProcessAsUserA(
@@ -132,7 +130,7 @@ private:
                     &args[0],         // argumenst (writable buffer)
                     NULL,             // process security attributes
                     NULL,             // primary thread security attributes
-                    TRUE,             // handles are inherited
+                    TRUE,             // handles are inherited (for std pipes)
                     0,                // creation flags
                     NULL,             // use parent's environment
                     NULL,             // use parent's current directory
@@ -146,7 +144,7 @@ private:
                     &args[0],         // argumenst (writable buffer)
                     NULL,             // process security attributes
                     NULL,             // primary thread security attributes
-                    TRUE,             // handles are inherited
+                    TRUE,             // handles are inherited (for std pipes)
                     0,                // creation flags
                     NULL,             // use parent's environment
                     NULL,             // use parent's current directory
@@ -154,7 +152,7 @@ private:
                     &procInfo) != 0;  // receives PROCESS_INFORMATION
             }
 
-            DWORD exitCode = ERROR_INVALID_FUNCTION;
+            DWORD exitCode{ ERROR_INVALID_FUNCTION };
             if (!success)
             {
                 exitCode = ::GetLastError();
@@ -165,15 +163,16 @@ private:
             }
             else
             {
+                // close the handles that are only used by the parent
                 stdInPipe.CloseReadHandle();
-			    stdOutPipe.CloseWriteHandle();
+                stdOutPipe.CloseWriteHandle();
                 stdErrPipe.CloseWriteHandle();
 			
 			    if (!stdInBytes.empty())
                 {
                     try
                     {
-                        stdInPipe.Write(stdInBytes.data(), static_cast<DWORD>(stdInBytes.size()));  // cast needed for 64-bit!
+                        stdInPipe.Write(stdInBytes.data(), static_cast<DWORD>(stdInBytes.size()));
                     }
                     catch (std::system_error &e)
                     {
@@ -186,7 +185,7 @@ private:
                 stdInPipe.CloseWriteHandle();
                 stdInBytes.clear();
             
-                // read asynchronously from childs stdout and stderr
+                // read asynchronously from child's stdout and stderr
                 // (unfortunately calling with ptr to member did not work...)
                 auto stdOutReader = std::async(std::launch::async, [&stdOutPipe] { return stdOutPipe.Read(); } );
                 auto stdErrReader = std::async(std::launch::async, [&stdErrPipe] { return stdErrPipe.Read(); } );
@@ -280,7 +279,6 @@ private:
     #endif
         return code.message();
     }
-
 
     std::string stdInBytes;
 	std::string stdOutBytes;

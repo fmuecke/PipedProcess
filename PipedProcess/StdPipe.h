@@ -12,7 +12,7 @@
 
 struct StdPipe
 {
-	StdPipe()  
+    StdPipe()  
     {
         m_sa.nLength = sizeof(SECURITY_ATTRIBUTES);
         m_sa.bInheritHandle = true;  // pipe handles should be inherited
@@ -45,7 +45,7 @@ struct StdPipe
 	
 	std::string Read()
 	{
-		std::array<char, 4096> buffer = {};
+		std::array<char, 4096> buffer{};
 		std::string result;
 
 		using std::begin;
@@ -53,7 +53,7 @@ struct StdPipe
 
 		for (;;)
 		{
-			DWORD bytesRead = 0;
+            DWORD bytesRead{ 0 };
 			bool success = ::ReadFile(_readHandle, &buffer[0], static_cast<DWORD>(buffer.size()), &bytesRead, NULL) != 0;
 			if (!success)
 			{
@@ -65,7 +65,7 @@ struct StdPipe
 
 				break;
 			}
-            else if (bytesRead == 0)
+            else if (0 == bytesRead)
             {
                 break;
             }
@@ -78,7 +78,7 @@ struct StdPipe
 
     void Write(const char* pBytes, int len) const
     {
-        DWORD bytesWritten = 0;
+        DWORD bytesWritten{ 0 };
         if (!::WriteFile(_writeHandle, pBytes, len, &bytesWritten, NULL))
         {
             auto err = ::GetLastError();
