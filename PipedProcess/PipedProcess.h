@@ -16,11 +16,15 @@
 #include <iostream>
 #endif
 
+// This class is used to create a child process and to redirect 
+// its standard input, output and error streams.
 class PipedProcess
 {
 public:
     enum class WindowMode { Visible = 0, Hidden = 1 };
 
+    // This class is used to signal the child process to abort execution
+    // Overwrite the IsSet() method to implement the desired behavior
     struct EmptyAbortEvent
 	{
 		bool IsSet() const { return false; }
@@ -32,11 +36,13 @@ public:
 	~PipedProcess()
 	{}
 
+    // Set the window mode for the child process (default is hidden)
     void SetWindowMode(WindowMode mode)
     {
         windowMode = mode;
     }
 
+    // Run a child process with the specified program and arguments
 	DWORD Run(const char* program, const char* arguments)
 	{
 		EmptyAbortEvent abortEvent;
@@ -44,12 +50,7 @@ public:
 		return Run(program, arguments, abortEvent, userToken);
 	}
 
-	DWORD RunAs(const HANDLE& token, const char* program, const char* arguments)
-	{
-		EmptyAbortEvent abortEvent;
-		return Run(program, arguments, abortEvent, &token);
-	}
-
+    // Run a child process with the specified program and arguments and abort event
 	template<class T>
 	DWORD Run(const char* program, const char* arguments, T& abortEvent)
 	{
@@ -57,28 +58,39 @@ public:
 		return Run(program, arguments, abortEvent, userToken);
 	}
 
+    // Run a child process with the specified program and arguments using the specified user token
+    DWORD RunAs(const HANDLE& token, const char* program, const char* arguments)
+    {
+        EmptyAbortEvent abortEvent;
+        return Run(program, arguments, abortEvent, &token);
+    }
+
+    // Run a child process with the specified program and arguments using the specified user token and abort event
 	template<class T>
 	DWORD RunAs(const HANDLE& token, const char* program, const char* arguments, T& abortEvent)
 	{
 		return Run(program, arguments, abortEvent, &token);
 	}
 
+    // Set the data that should be written to the child process' standard input stream
 	void SetStdInData(const char* pData, size_t len)
 	{
 		std::string tmp(pData, pData + len);
 		stdInBytes.swap(tmp);
 	}
 
-	bool HasStdOutData() const { return !stdOutBytes.empty(); }
-	bool HasStdErrData() const { return !stdErrBytes.empty(); }
+	bool HasStdOutData() const { return !stdOutBytes.empty(); } // check if there is data available to read on stdout
+	bool HasStdErrData() const { return !stdErrBytes.empty(); } // check if there is data available to read on stderr
 
-	std::string FetchStdOutData()
+	// Fetch the data that was written to the child process' standard output stream
+    std::string FetchStdOutData()
 	{
 		std::string ret;
 		ret.swap(stdOutBytes);
 		return ret;
 	}
 
+    // Fetch the data that was written to the child process' standard error stream
 	std::string FetchStdErrData()
 	{
 		std::string ret;
@@ -87,6 +99,9 @@ public:
 	}
 
 private:
+    
+    // Run a child process with the specified program and arguments 
+    // using the specified user token and abort event
     template<class T>
     DWORD Run(const char* program, const char* arguments, T& abortEvent, HANDLE const* pUserAccessToken)
     {
@@ -186,9 +201,8 @@ private:
                 stdInBytes.clear();
             
                 // read asynchronously from child's stdout and stderr
-                // (unfortunately calling with ptr to member did not work...)
-                auto stdOutReader = std::async(std::launch::async, [&stdOutPipe] { return stdOutPipe.Read(); } );
-                auto stdErrReader = std::async(std::launch::async, [&stdErrPipe] { return stdErrPipe.Read(); } );
+                auto stdOutReader = std::async(std::launch::async, &StdPipe::Read, &stdOutPipe);
+                auto stdErrReader = std::async(std::launch::async, &StdPipe::Read, &stdErrPipe);
 
                 // check for abort signal or pipe read errors while process is still running
                 while (WAIT_TIMEOUT == ::WaitForSingleObject(procInfo.hProcess, 50))
@@ -198,7 +212,7 @@ private:
                         stdErrReader.wait_for(std::chrono::seconds(0)) == std::future_status::ready || 
                         abortEvent.IsSet())
                     {
-                        ::TerminateProcess(procInfo.hProcess, HRESULT_CODE(E_ABORT));
+                        ::TerminateProcess(procInfo.hProcess, ERROR_PROCESS_ABORTED);
                         break;
                     }
                 }
@@ -239,8 +253,9 @@ private:
             stdErrBytes = { msg.data(), msg.data() + msg.size() };
             return e.code().value();
         }
-    }  // note: all pipe handles will be closed by the std pipe wrapper class
+    }  // all pipe handles will be closed by the std pipe wrapper class
 
+    // Set the window flags for the child process (e.g. hidden or visible)
     static void SetWindowFlags(STARTUPINFOA& startInfo, WindowMode mode)
     {
         if (mode == WindowMode::Hidden)
@@ -250,6 +265,7 @@ private:
         }
     }
 
+    // Get the error message for a given error code
     static std::string GetErrorString(std::error_code const& code)
     {
         // MSVC++ prior to VS2015 does not map all system error codes within std::system_category

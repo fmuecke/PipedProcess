@@ -44,3 +44,7 @@ ipch/
 .vs/
 */Debug/
 */Release/
+Debug/
+Release/
+*.bak
+bin/
