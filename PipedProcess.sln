@@ -12,6 +12,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DemoChildProc", "DemoChildP
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{A52363C2-DB08-478F-9740-A7BD474FD125}"
 	ProjectSection(SolutionItems) = preProject
+		build_package.ps1 = build_package.ps1
 		LICENSE = LICENSE
 		PipedProcess.autopkg = PipedProcess.autopkg
 		README.md = README.md

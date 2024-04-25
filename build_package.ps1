@@ -1,1 +1,0 @@
-Write-NuGetPackage .\PipedProcess.autopkg
