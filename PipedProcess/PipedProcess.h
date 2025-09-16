@@ -5,11 +5,14 @@
 #pragma once
 
 #include "StdPipe.h"
+#include "UniqueHandle.h"
 #include "windows.h"
 #include <algorithm>
 #include <future>
 #include <string>
 #include <vector>
+#include <filesystem>
+#include <string_view>
 
 #ifdef _DEBUG
 #include <system_error>
@@ -99,12 +102,12 @@ public:
 	}
 
 private:
-    
+       
     // Run a child process with the specified program and arguments 
     // using the specified user token and abort event
     template<class T>
     DWORD Run(const char* program, const char* arguments, T& abortEvent, HANDLE const* pUserAccessToken)
-    {
+    {        
         // arguments need to be in a non const array for the API call
         const auto len = strlen(arguments) + 1;
         std::vector<char> args(static_cast<int>(len), 0);
@@ -113,7 +116,7 @@ private:
         try
         {
             // Note: Raymond Chen ("The Old New Thing") has some thoughtful insights about pipes:
-			// "Be careful when redirecting both a process’s stdin and stdout to pipes, for you can easily deadlock"
+			// "Be careful when redirecting both a processï¿½s stdin and stdout to pipes, for you can easily deadlock"
 			// https://blogs.msdn.microsoft.com/oldnewthing/20110707-00/?p=10223
 			StdPipe stdInPipe;
             StdPipe stdOutPipe;
@@ -178,6 +181,10 @@ private:
             }
             else
             {
+                // Use RAII for automatic handle cleanup
+                UniqueHandle processHandle(procInfo.hProcess);
+                UniqueHandle threadHandle(procInfo.hThread);
+                
                 // close the handles that are only used by the parent
                 stdInPipe.CloseReadHandle();
                 stdOutPipe.CloseWriteHandle();
@@ -205,21 +212,21 @@ private:
                 auto stdErrReader = std::async(std::launch::async, &StdPipe::Read, &stdErrPipe);
 
                 // check for abort signal or pipe read errors while process is still running
-                while (WAIT_TIMEOUT == ::WaitForSingleObject(procInfo.hProcess, 50))
+                while (WAIT_TIMEOUT == ::WaitForSingleObject(processHandle.get(), 50))
                 {
                     // If the reader already has a result there must have been an exception --> stop execution
                     if (stdOutReader.wait_for(std::chrono::seconds(0)) == std::future_status::ready || 
                         stdErrReader.wait_for(std::chrono::seconds(0)) == std::future_status::ready || 
                         abortEvent.IsSet())
                     {
-                        ::TerminateProcess(procInfo.hProcess, ERROR_PROCESS_ABORTED);
+                        ::TerminateProcess(processHandle.get(), ERROR_PROCESS_ABORTED);
                         break;
                     }
                 }
 
-                ::GetExitCodeProcess(procInfo.hProcess, &exitCode);
-                ::CloseHandle(procInfo.hProcess);
-                ::CloseHandle(procInfo.hThread);
+                ::GetExitCodeProcess(processHandle.get(), &exitCode);
+                // Process handles will be automatically closed by UniqueHandle destructors
+                // EOF signaling to pipes happens when child process exits (not related to these handles)
 
                 try
                 {
@@ -302,5 +309,3 @@ private:
 
     WindowMode windowMode = { WindowMode::Hidden };
 };
-
-

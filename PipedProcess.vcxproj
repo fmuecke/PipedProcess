@@ -84,6 +84,7 @@
   <ItemGroup>
     <ClInclude Include="PipedProcess\PipedProcess.h" />
     <ClInclude Include="PipedProcess\StdPipe.h" />
+    <ClInclude Include="PipedProcess\UniqueHandle.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />

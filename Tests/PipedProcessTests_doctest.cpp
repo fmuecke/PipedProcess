@@ -34,7 +34,7 @@ TEST_CASE_FIXTURE(PipedProcessTestFixture, "Run with empty program returns error
     PipedProcess process;
 
     int exitCode = process.Run("", "");
-    CHECK(exitCode == 3);
+    CHECK(exitCode == 3); // ERROR_PATH_NOT_FOUND
     CHECK(process.HasStdErrData());
 }
 
@@ -43,7 +43,7 @@ TEST_CASE_FIXTURE(PipedProcessTestFixture, "Run with non-existent program return
     PipedProcess process;
 
     int exitCode = process.Run("nonexistent.exe", "");
-    CHECK(exitCode == 2);
+    CHECK(exitCode == 2); // ERROR_FILE_NOT_FOUND
     CHECK(process.HasStdErrData());
 }
 
@@ -52,7 +52,7 @@ TEST_CASE_FIXTURE(PipedProcessTestFixture, "Run cmd with exit code 1")
     PipedProcess process;
 
     int exitCode = process.Run(cmdPath.c_str(), "/c exit 1");
-    CHECK(exitCode == 1);
+    CHECK(exitCode == 1); // ERROR_INVALID_FUNCTION
 }
 
 TEST_CASE_FIXTURE(PipedProcessTestFixture, "Run with valid program returns zero")
@@ -266,5 +266,62 @@ TEST_CASE_FIXTURE(PipedProcessTestFixture, "Multiple process instances")
         PipedProcess process;
         int exitCode = process.Run(cmdPath.c_str(), "/c echo test");
         CHECK(exitCode == 0);
+    }
+}
+
+// Tests to validate pipe EOF timing and handle closure behavior
+TEST_CASE_FIXTURE(PipedProcessTestFixture, "Pipe EOF timing validation")
+{
+    SUBCASE("EOF signaling with immediate process completion")
+    {
+        // Test that EOF signaling works correctly even when process exits quickly
+        PipedProcess process;
+        
+        int exitCode = process.Run(cmdPath.c_str(), "/c echo Hello && echo World");
+        
+        CHECK(exitCode == 0);
+        CHECK(process.HasStdOutData());
+        
+        std::string output = process.FetchStdOutData();
+        CHECK(output.find("Hello") != std::string::npos);
+        CHECK(output.find("World") != std::string::npos);
+    }
+    
+    SUBCASE("EOF signaling with both stdout and stderr")
+    {
+        // Test that both stdout and stderr get proper EOF signaling
+        PipedProcess process;
+        
+        // Command that outputs to both stdout and stderr
+        int exitCode = process.Run(cmdPath.c_str(), "/c echo stdout_data && echo stderr_data 1>&2");
+        
+        CHECK(exitCode == 0);
+        CHECK(process.HasStdOutData());
+        CHECK(process.HasStdErrData());
+        
+        std::string stdout_data = process.FetchStdOutData();
+        std::string stderr_data = process.FetchStdErrData();
+        
+        CHECK(stdout_data.find("stdout_data") != std::string::npos);
+        CHECK(stderr_data.find("stderr_data") != std::string::npos);
+    }
+    
+    SUBCASE("Large stdin data with proper EOF handling")
+    {
+        // Test that large data transfers complete properly with EOF signaling
+        PipedProcess process;
+        
+        // Use a reasonably large amount of data
+        std::string largeData(5000, 'X');
+        process.SetStdInData(largeData.c_str(), largeData.size());
+        
+        int exitCode = process.Run(echoPath.c_str(), "");
+        
+        CHECK(exitCode == 0);
+        CHECK(process.HasStdOutData());
+        
+        std::string output = process.FetchStdOutData();
+        CHECK(output.size() == largeData.size());
+        CHECK(output == largeData);
     }
 }

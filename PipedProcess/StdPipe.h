@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "UniqueHandle.h"
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -18,6 +19,7 @@
 #include <algorithm>
 #include <limits>
 
+
 struct StdPipe
 {
     StdPipe()  
@@ -26,27 +28,28 @@ struct StdPipe
         _securityAttributes.bInheritHandle = true;  // pipe handles should be inherited
         _securityAttributes.lpSecurityDescriptor = nullptr;
 
-        if (!::CreatePipe(&_readHandle, &_writeHandle, &_securityAttributes, 0))
+        HANDLE readHandle = INVALID_HANDLE_VALUE, writeHandle = INVALID_HANDLE_VALUE;
+        if (!::CreatePipe(&readHandle, &writeHandle, &_securityAttributes, 0))
         {
             auto err = ::GetLastError();
             throw std::system_error(err, std::system_category());
         }
+        
+        // Move handles into RAII wrappers
+        _readHandle = UniqueHandle(readHandle);
+        _writeHandle = UniqueHandle(writeHandle);
     }
 
-	~StdPipe()
-	{
-        CloseWriteHandle();
-        CloseReadHandle();
-    }
+	~StdPipe() = default; // UniqueHandle destructors will handle cleanup
 
-	void CloseReadHandle()  { close(_readHandle); }
-	void CloseWriteHandle() { close(_writeHandle); }
+	void CloseReadHandle()  { _readHandle = UniqueHandle(); }
+	void CloseWriteHandle() { _writeHandle = UniqueHandle(); }
 
     // Returns true if there is data available to read from the pipe
     bool HasData() const
     {
         DWORD bytesAvailable{ 0 };
-        auto success = ::PeekNamedPipe(_readHandle, nullptr, 0, nullptr, &bytesAvailable, nullptr);
+        auto success = ::PeekNamedPipe(_readHandle.get(), nullptr, 0, nullptr, &bytesAvailable, nullptr);
         return success && bytesAvailable > 0;
     }
 	
@@ -62,7 +65,7 @@ struct StdPipe
         for(;;)
 		{
             DWORD bytesRead{ 0 };
-			bool success = ::ReadFile(_readHandle, &buffer[0], static_cast<DWORD>(buffer.size()), &bytesRead, NULL) != 0;
+			bool success = ::ReadFile(_readHandle.get(), &buffer[0], static_cast<DWORD>(buffer.size()), &bytesRead, NULL) != 0;
 			if (!success)
 			{
                 auto err = ::GetLastError();
@@ -101,7 +104,7 @@ struct StdPipe
             DWORD bytesWritten{ 0 };
             DWORD bytesToWrite = static_cast<DWORD>((std::min)(remainingBytes, static_cast<size_t>((std::numeric_limits<DWORD>::max)())));
             
-            if (!::WriteFile(_writeHandle, currentPos, bytesToWrite, &bytesWritten, NULL))
+            if (!::WriteFile(_writeHandle.get(), currentPos, bytesToWrite, &bytesWritten, NULL))
             {
                 auto err = ::GetLastError();
                 throw std::system_error(err, std::system_category());
@@ -118,25 +121,15 @@ struct StdPipe
         }
     }
 
-    HANDLE GetReadHandle() const { return _readHandle; }
-    HANDLE GetWriteHandle() const { return _writeHandle; }
+    HANDLE GetReadHandle() const { return _readHandle.get(); }
+    HANDLE GetWriteHandle() const { return _writeHandle.get(); }
 
 	StdPipe(const StdPipe&) = delete; // non-copyable
 	StdPipe& operator=(const StdPipe&) = delete; // non-assignable
 
 private:
-    
-    static void close(HANDLE& h)
-	{
-		if (h != INVALID_HANDLE_VALUE)
-		{
-			::CloseHandle(h);
-			h = INVALID_HANDLE_VALUE;
-		}
-	}
-
-	HANDLE _readHandle { INVALID_HANDLE_VALUE };
-	HANDLE _writeHandle { INVALID_HANDLE_VALUE };
+    UniqueHandle _readHandle{};
+    UniqueHandle _writeHandle{};
 #if _MSC_VER > 1800 // VS 2015 and above	
 	SECURITY_ATTRIBUTES _securityAttributes {0};
 #else 
