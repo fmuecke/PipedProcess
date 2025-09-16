@@ -21,9 +21,9 @@ namespace TestConstants
     static const size_t XLARGE_DATA_SIZE = 8192;
     static const size_t EXTRA_LARGE_DATA_SIZE = 10000;
     
-    // Test file names
-    static const char* ECHO_EXECUTABLE = "..\\bin\\stdEcho.exe";
-    static const char* DEMO_CHILD_EXECUTABLE = "..\\bin\\DemoChildProc.exe";
+    // Test file names - relative to bin directory where tests run
+    static const char* ECHO_EXECUTABLE = ".\\stdEcho.exe";
+    static const char* DEMO_CHILD_EXECUTABLE = ".\\DemoChildProc.exe";
     
     // Test messages
     static const char* HELLO_WORLD_MESSAGE = "Hello World!";

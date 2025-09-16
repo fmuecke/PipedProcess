@@ -7,11 +7,16 @@
 
 #pragma once
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <Windows.h>
 #include <array>
 #include <string>
 #include <system_error>
 #include <iterator>
+#include <algorithm>
+#include <limits>
 
 struct StdPipe
 {
@@ -54,9 +59,6 @@ struct StdPipe
 		std::array<char, readBufferSize> buffer{};
 		std::string result;
 
-		using std::begin;
-		using std::end;
-
         for(;;)
 		{
             DWORD bytesRead{ 0 };
@@ -76,7 +78,7 @@ struct StdPipe
                 break;
             }
 
-			std::move(begin(buffer), begin(buffer) + bytesRead, std::back_inserter(result));
+			result.append(buffer.data(), bytesRead);
 		}
 
 	    return result;
@@ -86,11 +88,33 @@ struct StdPipe
     // To signal finish writing to the pipe, call CloseWriteHandle()
     void Write(const char* pBytes, size_t len) const
     {
-        DWORD bytesWritten{ 0 };
-        if (!::WriteFile(_writeHandle, pBytes, static_cast<DWORD>(len), &bytesWritten, NULL))
+        if (!pBytes && len > 0)
         {
-            auto err = ::GetLastError();
-            throw std::system_error(err, std::system_category());
+            throw std::invalid_argument("pBytes cannot be null when len > 0");
+        }
+
+        const char* currentPos = pBytes;
+        size_t remainingBytes = len;
+
+        while (remainingBytes > 0)
+        {
+            DWORD bytesWritten{ 0 };
+            DWORD bytesToWrite = static_cast<DWORD>((std::min)(remainingBytes, static_cast<size_t>((std::numeric_limits<DWORD>::max)())));
+            
+            if (!::WriteFile(_writeHandle, currentPos, bytesToWrite, &bytesWritten, NULL))
+            {
+                auto err = ::GetLastError();
+                throw std::system_error(err, std::system_category());
+            }
+
+            if (bytesWritten == 0)
+            {
+                // This shouldn't happen if WriteFile succeeded, but better be safe
+                throw std::system_error(ERROR_WRITE_FAULT, std::system_category(), "WriteFile succeeded but wrote 0 bytes");
+            }
+
+            currentPos += bytesWritten;
+            remainingBytes -= bytesWritten;
         }
     }
 

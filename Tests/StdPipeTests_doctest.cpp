@@ -3,6 +3,7 @@
 #include <string>
 #include <thread>
 #include <future>
+#include <stdexcept>
 
 TEST_CASE("Has valid handles after construction")
 {
@@ -111,6 +112,42 @@ TEST_CASE("Empty data handling")
     
     auto result = pipe.Read();
     CHECK(result.empty());
+}
+
+TEST_CASE("Large data write handling")
+{
+    StdPipe pipe;
+    
+    // Test with very large data that would stress the write mechanism
+    // This tests the partial write handling in the Write() method
+    const size_t largeSize = 1024 * 1024; // 1MB
+    std::string largeData(largeSize, 'X');
+    
+    // Use async to avoid deadlock when buffer fills
+    auto writeTask = std::async(std::launch::async, [&]() {
+        pipe.Write(largeData.c_str(), largeData.size());
+        pipe.CloseWriteHandle();
+    });
+    
+    auto readData = pipe.Read();
+    writeTask.wait();
+    
+    CHECK(readData.size() == largeSize);
+    CHECK(readData == largeData);
+}
+
+TEST_CASE("Write input validation")
+{
+    StdPipe pipe;
+    
+    // Test null pointer with non-zero length should throw
+    CHECK_THROWS_AS(pipe.Write(nullptr, 10), std::invalid_argument);
+    
+    // Test null pointer with zero length should work
+    CHECK_NOTHROW(pipe.Write(nullptr, 0));
+    
+    // Test empty string should work
+    CHECK_NOTHROW(pipe.Write("", 0));
 }
 
 TEST_CASE("Error handling with invalid handles")
