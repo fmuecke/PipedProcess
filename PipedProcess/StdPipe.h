@@ -3,7 +3,7 @@
 // https://github.com/fmuecke/PipedProcess
 
 // This class is used to create a pipe for the standard input, output and error streams of a child process.
-// The class is used by the PipedProcess class to create the pipes for the child process.
+// It is used by the PipedProcess class to create the pipes for the child process.
 
 #pragma once
 
@@ -17,11 +17,11 @@ struct StdPipe
 {
     StdPipe()  
     {
-        m_sa.nLength = sizeof(SECURITY_ATTRIBUTES);
-        m_sa.bInheritHandle = true;  // pipe handles should be inherited
-        m_sa.lpSecurityDescriptor = nullptr;
+        _securityAttributes.nLength = sizeof(SECURITY_ATTRIBUTES);
+        _securityAttributes.bInheritHandle = true;  // pipe handles should be inherited
+        _securityAttributes.lpSecurityDescriptor = nullptr;
 
-        if (!::CreatePipe(&_readHandle, &_writeHandle, &m_sa, 0))
+        if (!::CreatePipe(&_readHandle, &_writeHandle, &_securityAttributes, 0))
         {
             auto err = ::GetLastError();
             throw std::system_error(err, std::system_category());
@@ -34,8 +34,8 @@ struct StdPipe
         CloseReadHandle();
     }
 
-	void CloseReadHandle()  { Close(_readHandle); }
-	void CloseWriteHandle() { Close(_writeHandle); }
+	void CloseReadHandle()  { close(_readHandle); }
+	void CloseWriteHandle() { close(_writeHandle); }
 
     // Returns true if there is data available to read from the pipe
     bool HasData() const
@@ -92,18 +92,15 @@ struct StdPipe
         }
     }
 
-    // Returns the read and write handles of the pipe
     HANDLE GetReadHandle() const { return _readHandle; }
     HANDLE GetWriteHandle() const { return _writeHandle; }
-
 
 	StdPipe(const StdPipe&) = delete; // non-copyable
 	StdPipe& operator=(const StdPipe&) = delete; // non-assignable
 
 private:
     
-    // Closes the handle if it is not INVALID_HANDLE_VALUE
-    static void Close(HANDLE& h)
+    static void close(HANDLE& h)
 	{
 		if (h != INVALID_HANDLE_VALUE)
 		{
@@ -115,8 +112,8 @@ private:
 	HANDLE _readHandle { INVALID_HANDLE_VALUE };
 	HANDLE _writeHandle { INVALID_HANDLE_VALUE };
 #if _MSC_VER > 1800 // VS 2015 and above	
-	SECURITY_ATTRIBUTES m_sa {0};
+	SECURITY_ATTRIBUTES _securityAttributes {0};
 #else 
-	SECURITY_ATTRIBUTES m_sa;
+	SECURITY_ATTRIBUTES _securityAttributes;
 #endif
 };
