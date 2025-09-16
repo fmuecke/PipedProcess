@@ -187,7 +187,7 @@ private:
                 {
                     try
                     {
-                        stdInPipe.Write(stdInBytes.data(), static_cast<DWORD>(stdInBytes.size()));
+                        stdInPipe.Write(stdInBytes.data(), stdInBytes.size());
                     }
                     catch (std::system_error &e)
                     {

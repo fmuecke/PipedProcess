@@ -49,7 +49,9 @@ struct StdPipe
     // In order to signal finish reading from the pipe, the child process should close the write handle
 	std::string Read() const
 	{
-		std::array<char, 4096> buffer{};
+		const int readBufferSize{ 4096 };
+
+		std::array<char, readBufferSize> buffer{};
 		std::string result;
 
 		using std::begin;
@@ -82,10 +84,10 @@ struct StdPipe
 
     // Writes data to the pipe
     // To signal finish writing to the pipe, call CloseWriteHandle()
-    void Write(const char* pBytes, int len) const
+    void Write(const char* pBytes, size_t len) const
     {
         DWORD bytesWritten{ 0 };
-        if (!::WriteFile(_writeHandle, pBytes, len, &bytesWritten, NULL))
+        if (!::WriteFile(_writeHandle, pBytes, static_cast<DWORD>(len), &bytesWritten, NULL))
         {
             auto err = ::GetLastError();
             throw std::system_error(err, std::system_category());

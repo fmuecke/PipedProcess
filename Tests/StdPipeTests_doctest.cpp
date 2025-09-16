@@ -26,7 +26,7 @@ TEST_CASE("Write and read basic functionality")
     StdPipe pipe;
     std::string testString = "Hello World!";
     
-    pipe.Write(testString.c_str(), static_cast<int>(testString.size()));
+    pipe.Write(testString.c_str(), testString.size());
     pipe.CloseWriteHandle();
 
     auto readString = pipe.Read();
@@ -39,7 +39,7 @@ TEST_CASE("HasData functionality")
     CHECK_FALSE(pipe.HasData());
 
     std::string testString = "Hello World!";
-    pipe.Write(testString.c_str(), static_cast<int>(testString.size()));
+    pipe.Write(testString.c_str(), testString.size());
 
     CHECK(pipe.HasData());
 }
@@ -64,7 +64,7 @@ TEST_CASE("Write and read large data")
     
     // Use async to avoid deadlock when buffer fills
     auto writeTask = std::async(std::launch::async, [&]() {
-        pipe.Write(testString.c_str(), static_cast<int>(testString.size()));
+        pipe.Write(testString.c_str(), testString.size());
         pipe.CloseWriteHandle();
     });
     
@@ -80,8 +80,8 @@ TEST_CASE("Write and read multiple times")
     std::string testString1 = "Hello World!";
     std::string testString2 = "Goodbye, World!";
     
-    pipe.Write(testString1.c_str(), static_cast<int>(testString1.size()));
-    pipe.Write(testString2.c_str(), static_cast<int>(testString2.size()));
+    pipe.Write(testString1.c_str(), testString1.size());
+    pipe.Write(testString2.c_str(), testString2.size());
     pipe.CloseWriteHandle();
 
     auto readString = pipe.Read();
@@ -96,7 +96,7 @@ TEST_CASE("Binary data handling")
     std::string binaryData = "Hello\0World\0Binary\0Data";
     binaryData = std::string(binaryData.c_str(), 23); // Include null bytes
     
-    pipe.Write(binaryData.c_str(), static_cast<int>(binaryData.size()));
+    pipe.Write(binaryData.c_str(), binaryData.size());
     pipe.CloseWriteHandle();
     
     auto readData = pipe.Read();
@@ -121,7 +121,7 @@ TEST_CASE("Error handling with invalid handles")
     
     // Writing to closed pipe should throw an exception
     std::string testString = "Hello World!";
-    CHECK_THROWS(pipe.Write(testString.c_str(), static_cast<int>(testString.size())));
+    CHECK_THROWS(pipe.Write(testString.c_str(), testString.size()));
     
     // Reading from closed pipe should also throw an exception
     CHECK_THROWS(pipe.Read());
