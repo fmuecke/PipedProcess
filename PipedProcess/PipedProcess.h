@@ -275,31 +275,6 @@ private:
     // Get the error message for a given error code
     static std::string GetErrorString(std::error_code const& code)
     {
-        // MSVC++ prior to VS2015 does not map all system error codes within std::system_category
-        // --> use FormatMessage to retrieve proper error message
-
-#if _MSC_VER <= 1800 // VS 2015 and above	
-        if (code.message() == "unknown error")
-        {
-
-            if (code.value() == 0) { return std::string(); }
-
-            char* strBuffer = nullptr;
-            auto size = ::FormatMessageA(
-                FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                nullptr,
-                code.value(),
-                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                reinterpret_cast<LPSTR>(&strBuffer),
-                0,
-                NULL);
-
-            auto str = std::string(strBuffer, size);
-            ::LocalFree(strBuffer);
-
-            return str;
-        }
-    #endif
         return code.message();
     }
 
