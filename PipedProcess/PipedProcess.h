@@ -10,7 +10,6 @@
 #include <algorithm>
 #include <future>
 #include <string>
-#include <vector>
 #include <filesystem>
 #include <string_view>
 
@@ -124,10 +123,8 @@ private:
 
         try
         {
-            // arguments need to be in a non const array for the API call
-            const auto len = strlen(arguments) + 1;
-            std::vector<char> args(static_cast<int>(len), 0);
-            std::copy(arguments, arguments + len, args.begin());
+            // arguments need to be in a writable buffer for the API call
+            std::string args = arguments;
 
             // Note: Raymond Chen ("The Old New Thing") has some thoughtful insights about pipes:
 			// "Be careful when redirecting both a process�s stdin and stdout to pipes, for you can easily deadlock"
@@ -159,7 +156,7 @@ private:
                 success = ::CreateProcessAsUserA(
                     *pUserAccessToken,
                     program,          // executable
-                    &args[0],         // argumenst (writable buffer)
+                    args.data(),      // arguments (writable buffer)
                     NULL,             // process security attributes
                     NULL,             // primary thread security attributes
                     TRUE,             // handles are inherited (for std pipes)
@@ -173,7 +170,7 @@ private:
             {
                 success = ::CreateProcessA(
                     program,          // executable
-                    &args[0],         // argumenst (writable buffer)
+                    args.data(),      // arguments (writable buffer)
                     NULL,             // process security attributes
                     NULL,             // primary thread security attributes
                     TRUE,             // handles are inherited (for std pipes)
