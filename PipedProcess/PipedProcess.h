@@ -46,6 +46,7 @@ public:
     }
 
     // Run a child process with the specified program and arguments
+    // SECURITY: Caller must validate 'program' and 'arguments' parameters to prevent command injection
 	DWORD Run(const char* program, const char* arguments)
 	{
 		EmptyAbortEvent abortEvent;
@@ -76,6 +77,7 @@ public:
 	}
 
     // Set the data that should be written to the child process' standard input stream
+    // SECURITY: Caller should limit 'len' to prevent memory exhaustion attacks
 	void SetStdInData(const char* pData, size_t len)
 	{
 		std::string tmp(pData, pData + len);

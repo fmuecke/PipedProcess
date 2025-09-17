@@ -12,6 +12,17 @@ retrieve the result data via stdout. Errors can be received via stderr.
 
 Currently the class can *not* be used for asynchronous communication (e.g. messages) to and from the child process.
 
+## Security Considerations
+
+**Important:** This library does not validate input parameters. It is the **caller's responsibility** to ensure:
+
+- **Program paths** are trusted and do not contain malicious executable paths
+- **Arguments** do not contain command injection vectors (e.g., `|`, `&`, `;`, `>`, `<` when used with shell commands)
+- **Input data** size is reasonable to prevent memory exhaustion
+- **Program execution** is limited to trusted executables in secure environments
+
+For applications handling untrusted input, implement validation before calling PipedProcess methods.
+
 ## MIT License
 
 Feel free to use. See `LICENSE` file for further information.
