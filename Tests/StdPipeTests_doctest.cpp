@@ -163,3 +163,19 @@ TEST_CASE("Error handling with invalid handles")
     // Reading from closed pipe should also throw an exception
     CHECK_THROWS(pipe.Read());
 }
+
+// Test for null pointer parameter validation in StdPipe::Write
+TEST_CASE("Write with null pointer and zero length succeeds")
+{
+    StdPipe pipe;
+    
+    // This should not throw and should return immediately
+    CHECK_NOTHROW(pipe.Write(nullptr, 0));
+}
+
+TEST_CASE("Write with null pointer and non-zero length throws invalid_argument")
+{
+    StdPipe pipe;
+    
+    CHECK_THROWS_AS(pipe.Write(nullptr, 5), std::invalid_argument);
+}

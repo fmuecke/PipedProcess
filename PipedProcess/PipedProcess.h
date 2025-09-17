@@ -109,14 +109,26 @@ private:
     // using the specified user token and abort event
     template<class T>
     DWORD Run(const char* program, const char* arguments, T& abortEvent, HANDLE const* pUserAccessToken)
-    {        
-        // arguments need to be in a non const array for the API call
-        const auto len = strlen(arguments) + 1;
-        std::vector<char> args(static_cast<int>(len), 0);
-        std::copy(arguments, arguments + len, args.begin());
+    {
+        // Validate parameters to prevent null pointer dereference
+        if (!program)
+        {
+            stdErrBytes = "Error: program parameter cannot be null";
+            return ERROR_INVALID_PARAMETER;
+        }
+        if (!arguments)
+        {
+            stdErrBytes = "Error: arguments parameter cannot be null";
+            return ERROR_INVALID_PARAMETER;
+        }
 
         try
         {
+            // arguments need to be in a non const array for the API call
+            const auto len = strlen(arguments) + 1;
+            std::vector<char> args(static_cast<int>(len), 0);
+            std::copy(arguments, arguments + len, args.begin());
+
             // Note: Raymond Chen ("The Old New Thing") has some thoughtful insights about pipes:
 			// "Be careful when redirecting both a process�s stdin and stdout to pipes, for you can easily deadlock"
 			// https://blogs.msdn.microsoft.com/oldnewthing/20110707-00/?p=10223

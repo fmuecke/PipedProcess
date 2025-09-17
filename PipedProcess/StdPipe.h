@@ -96,6 +96,12 @@ struct StdPipe
             throw std::invalid_argument("pBytes cannot be null when len > 0");
         }
 
+        // Early return for empty writes to avoid any null pointer handling
+        if (len == 0)
+        {
+            return;
+        }
+
         const char* currentPos = pBytes;
         size_t remainingBytes = len;
 

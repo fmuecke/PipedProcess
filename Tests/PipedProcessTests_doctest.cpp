@@ -325,3 +325,40 @@ TEST_CASE_FIXTURE(PipedProcessTestFixture, "Pipe EOF timing validation")
         CHECK(output == largeData);
     }
 }
+
+// Test for null pointer parameter validation
+TEST_CASE("Run with null program parameter returns ERROR_INVALID_PARAMETER")
+{
+    PipedProcess process;
+    
+    DWORD exitCode = process.Run(nullptr, "");
+    CHECK(exitCode == ERROR_INVALID_PARAMETER);
+    CHECK(process.HasStdErrData());
+    
+    std::string errorMsg = process.FetchStdErrData();
+    CHECK(errorMsg.find("program parameter cannot be null") != std::string::npos);
+}
+
+TEST_CASE("Run with null arguments parameter returns ERROR_INVALID_PARAMETER")
+{
+    PipedProcess process;
+    
+    DWORD exitCode = process.Run("cmd.exe", nullptr);
+    CHECK(exitCode == ERROR_INVALID_PARAMETER);
+    CHECK(process.HasStdErrData());
+    
+    std::string errorMsg = process.FetchStdErrData();
+    CHECK(errorMsg.find("arguments parameter cannot be null") != std::string::npos);
+}
+
+TEST_CASE("Run with both null parameters returns ERROR_INVALID_PARAMETER")
+{
+    PipedProcess process;
+    
+    DWORD exitCode = process.Run(nullptr, nullptr);
+    CHECK(exitCode == ERROR_INVALID_PARAMETER);
+    CHECK(process.HasStdErrData());
+    
+    std::string errorMsg = process.FetchStdErrData();
+    CHECK(errorMsg.find("program parameter cannot be null") != std::string::npos);
+}
