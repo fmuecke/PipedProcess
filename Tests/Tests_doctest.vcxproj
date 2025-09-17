@@ -159,6 +159,7 @@
     <ClCompile Include="doctest_main.cpp" />
     <ClCompile Include="PipedProcessTests_doctest.cpp" />
     <ClCompile Include="StdPipeTests_doctest.cpp" />
+    <ClCompile Include="UniqueHandleTests_doctest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="doctest\doctest.h" />
