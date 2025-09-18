@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>PipedProcess</id>
+    <version>2.1.3</version>
+    <title>PipedProcess</title>
+    <authors>Florian Mücke</authors>
+    <owners>Florian Mücke</owners>
+    <license type="file">LICENSE</license>
+    <projectUrl>https://github.com/fmuecke/PipedProcess</projectUrl>
+    <icon>images\nuget.png</icon>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <summary>C++ API wrapper for process with enabled std pipes</summary>
+    <description>C++ helper class to create a child process with redirected std in/out/error streams using the Windows API.</description>
+    <releaseNotes>v2.1.3: Major robustness and reliability improvements:
+
+Enhanced StdPipe Write Operations:
+- Robust partial write handling for large data chunks (supports multi-GB transfers)
+- Automatic retry logic for incomplete writes with proper progress tracking
+- Fixed edge cases in Write() method preventing data loss
+
+Security and Safety Enhancements:
+- Added comprehensive null pointer validation with ERROR_INVALID_PARAMETER returns
+- Enhanced RAII handle management with UniqueHandle wrapper preventing resource leaks
+- Added input validation and security documentation for safe API usage
+
+Performance and Maintainability:
+- Simplified argument handling from std::vector to std::string (reduced complexity)
+- Fixed incorrect std::move usage in Read() method improving performance
+- Added defensive programming patterns with early returns for edge cases
+
+Testing Excellence:
+- Comprehensive test suite with 49 test cases and 136 assertions
+- Added stress testing with 1MB data transfers validating partial write robustness
+- Enhanced binary data handling and multithreaded access testing
+- Migrated to modern doctest framework with superior error reporting
+
+All improvements maintain full backward compatibility while significantly improving reliability and performance.</releaseNotes>
+    <copyright>Copyright (c) 2015-2025 Florian Mücke. All rights reserved.</copyright>
+    <tags>c++ native pipes winapi process ipc raii header-only</tags>
+    <repository type="git" url="https://github.com/fmuecke/PipedProcess.git" />
+    <readme>README.md</readme>
+  </metadata>
+  <files>
+    <!-- Header files -->
+    <file src="PipedProcess\PipedProcess.h" target="build\native\include\PipedProcess\" />
+    <file src="PipedProcess\StdPipe.h" target="build\native\include\PipedProcess\" />
+    <file src="PipedProcess\UniqueHandle.h" target="build\native\include\PipedProcess\" />
+    
+    <!-- MSBuild targets file -->
+    <file src="PipedProcess.targets" target="build\native\PipedProcess.targets" />
+    
+    <!-- License and documentation -->
+    <file src="LICENSE" target="LICENSE" />
+    <file src="README.md" target="README.md" />
+    
+    <!-- Icon -->
+    <file src="nuget.png" target="images\nuget.png" />
+  </files>
+</package>
