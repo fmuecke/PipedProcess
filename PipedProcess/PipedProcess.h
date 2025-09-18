@@ -127,7 +127,8 @@ private:
             std::string args = arguments;
 
             // Note: Raymond Chen ("The Old New Thing") has some thoughtful insights about pipes:
-			// "Be careful when redirecting both a process�s stdin and stdout to pipes, for you can easily deadlock"
+			// "Be careful when redirecting both a process's stdin and stdout to pipes, for you can easily deadlock"
+
 			// https://blogs.msdn.microsoft.com/oldnewthing/20110707-00/?p=10223
 			StdPipe stdInPipe;
             StdPipe stdOutPipe;
