@@ -170,12 +170,47 @@ Feel free to use. See `LICENSE` file for further information.
 
 The project is a Visual Studio 2022 solution. It should be possible to build it with other compilers, but I have not tested it.
 
-## Create nuget package 
+## Creating NuGet Package
 
-1. Get CoApp script from https://coapp.github.io/pages/releases.html
-2. Install CoApp
-3. Run the following command to create the NuGet package
+### Prerequisites
+- [NuGet CLI](https://docs.microsoft.com/en-us/nuget/reference/nuget-exe-cli-reference) or [dotnet CLI](https://docs.microsoft.com/en-us/dotnet/core/tools/)
+- Visual Studio 2022 (for building)
 
-    Write-NuGetPackage .\PipedProcess.autopkg
+### Package Creation Steps
+
+1. **Build the solution** to ensure all tests pass:
+   ```
+   msbuild PipedProcess.sln -p:Configuration=Release -p:Platform=x64
+   ```
+
+2. **Create the NuGet package** using the modern nuspec file:
+   ```
+   nuget pack PipedProcess.nuspec
+   ```
+   
+   Or with dotnet CLI:
+   ```
+   dotnet pack PipedProcess.nuspec
+   ```
+
+3. **Publish to NuGet.org** (optional):
+   ```
+   nuget push PipedProcess.{version}.nupkg -Source https://api.nuget.org/v3/index.json -ApiKey {your-api-key}
+   ```
+
+### Package Contents
+The NuGet package includes:
+- **Headers**: `PipedProcess.h`, `StdPipe.h`, `UniqueHandle.h` in `include/PipedProcess/` directory
+- **MSBuild targets**: Automatic include path configuration and preprocessor definitions
+- **Documentation**: Inline comments and usage examples
+
+### Using the Package
+After installing the package in a project, simply include the headers:
+```cpp
+#include <PipedProcess/PipedProcess.h>
+#include <PipedProcess/StdPipe.h>
+```
+
+The MSBuild targets automatically configure include paths and preprocessor definitions.
 
 
