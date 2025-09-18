@@ -3,45 +3,53 @@
 // https://github.com/fmuecke/PipedProcess
 
 // This class is used to create a pipe for the standard input, output and error streams of a child process.
-// The class is used by the PipedProcess class to create the pipes for the child process.
+// It is used by the PipedProcess class to create the pipes for the child process.
 
 #pragma once
 
+#include "UniqueHandle.h"
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <Windows.h>
 #include <array>
 #include <string>
 #include <system_error>
 #include <iterator>
+#include <algorithm>
+#include <limits>
+
 
 struct StdPipe
 {
     StdPipe()  
     {
-        m_sa.nLength = sizeof(SECURITY_ATTRIBUTES);
-        m_sa.bInheritHandle = true;  // pipe handles should be inherited
-        m_sa.lpSecurityDescriptor = nullptr;
+        _securityAttributes.nLength = sizeof(SECURITY_ATTRIBUTES);
+        _securityAttributes.bInheritHandle = true;  // pipe handles should be inherited
+        _securityAttributes.lpSecurityDescriptor = nullptr;
 
-        if (!::CreatePipe(&_readHandle, &_writeHandle, &m_sa, 0))
+        HANDLE readHandle = INVALID_HANDLE_VALUE, writeHandle = INVALID_HANDLE_VALUE;
+        if (!::CreatePipe(&readHandle, &writeHandle, &_securityAttributes, 0))
         {
             auto err = ::GetLastError();
             throw std::system_error(err, std::system_category());
         }
+        
+        // Move handles into RAII wrappers
+        _readHandle = UniqueHandle(readHandle);
+        _writeHandle = UniqueHandle(writeHandle);
     }
 
-	~StdPipe()
-	{
-        CloseWriteHandle();
-        CloseReadHandle();
-    }
+	~StdPipe() = default; // UniqueHandle destructors will handle cleanup
 
-	void CloseReadHandle()  { Close(_readHandle); }
-	void CloseWriteHandle() { Close(_writeHandle); }
+	void CloseReadHandle()  { _readHandle = UniqueHandle(); }
+	void CloseWriteHandle() { _writeHandle = UniqueHandle(); }
 
     // Returns true if there is data available to read from the pipe
     bool HasData() const
     {
         DWORD bytesAvailable{ 0 };
-        auto success = ::PeekNamedPipe(_readHandle, nullptr, 0, nullptr, &bytesAvailable, nullptr);
+        auto success = ::PeekNamedPipe(_readHandle.get(), nullptr, 0, nullptr, &bytesAvailable, nullptr);
         return success && bytesAvailable > 0;
     }
 	
@@ -49,16 +57,15 @@ struct StdPipe
     // In order to signal finish reading from the pipe, the child process should close the write handle
 	std::string Read() const
 	{
-		std::array<char, 4096> buffer{};
-		std::string result;
+		const int readBufferSize{ 4096 };
 
-		using std::begin;
-		using std::end;
+		std::array<char, readBufferSize> buffer{};
+		std::string result;
 
         for(;;)
 		{
             DWORD bytesRead{ 0 };
-			bool success = ::ReadFile(_readHandle, &buffer[0], static_cast<DWORD>(buffer.size()), &bytesRead, NULL) != 0;
+			bool success = ::ReadFile(_readHandle.get(), &buffer[0], static_cast<DWORD>(buffer.size()), &bytesRead, NULL) != 0;
 			if (!success)
 			{
                 auto err = ::GetLastError();
@@ -74,7 +81,7 @@ struct StdPipe
                 break;
             }
 
-			std::move(begin(buffer), begin(buffer) + bytesRead, std::back_inserter(result));
+			result.append(buffer.data(), bytesRead);
 		}
 
 	    return result;
@@ -82,41 +89,56 @@ struct StdPipe
 
     // Writes data to the pipe
     // To signal finish writing to the pipe, call CloseWriteHandle()
-    void Write(const char* pBytes, int len) const
+    void Write(const char* pBytes, size_t len) const
     {
-        DWORD bytesWritten{ 0 };
-        if (!::WriteFile(_writeHandle, pBytes, len, &bytesWritten, NULL))
+        if (!pBytes && len > 0)
         {
-            auto err = ::GetLastError();
-            throw std::system_error(err, std::system_category());
+            throw std::invalid_argument("pBytes cannot be null when len > 0");
+        }
+
+        // Early return for empty writes to avoid any null pointer handling
+        if (len == 0)
+        {
+            return;
+        }
+
+        const char* currentPos = pBytes;
+        size_t remainingBytes = len;
+
+        while (remainingBytes > 0)
+        {
+            DWORD bytesWritten{ 0 };
+            DWORD bytesToWrite = static_cast<DWORD>((std::min)(remainingBytes, static_cast<size_t>((std::numeric_limits<DWORD>::max)())));
+            
+            if (!::WriteFile(_writeHandle.get(), currentPos, bytesToWrite, &bytesWritten, NULL))
+            {
+                auto err = ::GetLastError();
+                throw std::system_error(err, std::system_category());
+            }
+
+            if (bytesWritten == 0)
+            {
+                // This shouldn't happen if WriteFile succeeded, but better be safe
+                throw std::system_error(ERROR_WRITE_FAULT, std::system_category(), "WriteFile succeeded but wrote 0 bytes");
+            }
+
+            currentPos += bytesWritten;
+            remainingBytes -= bytesWritten;
         }
     }
 
-    // Returns the read and write handles of the pipe
-    HANDLE GetReadHandle() const { return _readHandle; }
-    HANDLE GetWriteHandle() const { return _writeHandle; }
-
+    HANDLE GetReadHandle() const { return _readHandle.get(); }
+    HANDLE GetWriteHandle() const { return _writeHandle.get(); }
 
 	StdPipe(const StdPipe&) = delete; // non-copyable
 	StdPipe& operator=(const StdPipe&) = delete; // non-assignable
 
 private:
-    
-    // Closes the handle if it is not INVALID_HANDLE_VALUE
-    static void Close(HANDLE& h)
-	{
-		if (h != INVALID_HANDLE_VALUE)
-		{
-			::CloseHandle(h);
-			h = INVALID_HANDLE_VALUE;
-		}
-	}
-
-	HANDLE _readHandle { INVALID_HANDLE_VALUE };
-	HANDLE _writeHandle { INVALID_HANDLE_VALUE };
+    UniqueHandle _readHandle{};
+    UniqueHandle _writeHandle{};
 #if _MSC_VER > 1800 // VS 2015 and above	
-	SECURITY_ATTRIBUTES m_sa {0};
+	SECURITY_ATTRIBUTES _securityAttributes {0};
 #else 
-	SECURITY_ATTRIBUTES m_sa;
+	SECURITY_ATTRIBUTES _securityAttributes;
 #endif
 };

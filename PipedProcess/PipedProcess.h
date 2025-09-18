@@ -5,11 +5,13 @@
 #pragma once
 
 #include "StdPipe.h"
+#include "UniqueHandle.h"
 #include "windows.h"
 #include <algorithm>
 #include <future>
 #include <string>
-#include <vector>
+#include <filesystem>
+#include <string_view>
 
 #ifdef _DEBUG
 #include <system_error>
@@ -43,6 +45,7 @@ public:
     }
 
     // Run a child process with the specified program and arguments
+    // SECURITY: Caller must validate 'program' and 'arguments' parameters to prevent command injection
 	DWORD Run(const char* program, const char* arguments)
 	{
 		EmptyAbortEvent abortEvent;
@@ -73,6 +76,7 @@ public:
 	}
 
     // Set the data that should be written to the child process' standard input stream
+    // SECURITY: Caller should limit 'len' to prevent memory exhaustion attacks
 	void SetStdInData(const char* pData, size_t len)
 	{
 		std::string tmp(pData, pData + len);
@@ -99,21 +103,32 @@ public:
 	}
 
 private:
-    
+       
     // Run a child process with the specified program and arguments 
     // using the specified user token and abort event
     template<class T>
     DWORD Run(const char* program, const char* arguments, T& abortEvent, HANDLE const* pUserAccessToken)
     {
-        // arguments need to be in a non const array for the API call
-        const auto len = strlen(arguments) + 1;
-        std::vector<char> args(static_cast<int>(len), 0);
-        std::copy(arguments, arguments + len, args.begin());
+        // Validate parameters to prevent null pointer dereference
+        if (!program)
+        {
+            stdErrBytes = "Error: program parameter cannot be null";
+            return ERROR_INVALID_PARAMETER;
+        }
+        if (!arguments)
+        {
+            stdErrBytes = "Error: arguments parameter cannot be null";
+            return ERROR_INVALID_PARAMETER;
+        }
 
         try
         {
+            // arguments need to be in a writable buffer for the API call
+            std::string args = arguments;
+
             // Note: Raymond Chen ("The Old New Thing") has some thoughtful insights about pipes:
-			// "Be careful when redirecting both a process’s stdin and stdout to pipes, for you can easily deadlock"
+			// "Be careful when redirecting both a process's stdin and stdout to pipes, for you can easily deadlock"
+
 			// https://blogs.msdn.microsoft.com/oldnewthing/20110707-00/?p=10223
 			StdPipe stdInPipe;
             StdPipe stdOutPipe;
@@ -142,7 +157,7 @@ private:
                 success = ::CreateProcessAsUserA(
                     *pUserAccessToken,
                     program,          // executable
-                    &args[0],         // argumenst (writable buffer)
+                    args.data(),      // arguments (writable buffer)
                     NULL,             // process security attributes
                     NULL,             // primary thread security attributes
                     TRUE,             // handles are inherited (for std pipes)
@@ -156,7 +171,7 @@ private:
             {
                 success = ::CreateProcessA(
                     program,          // executable
-                    &args[0],         // argumenst (writable buffer)
+                    args.data(),      // arguments (writable buffer)
                     NULL,             // process security attributes
                     NULL,             // primary thread security attributes
                     TRUE,             // handles are inherited (for std pipes)
@@ -178,6 +193,10 @@ private:
             }
             else
             {
+                // Use RAII for automatic handle cleanup
+                UniqueHandle processHandle(procInfo.hProcess);
+                UniqueHandle threadHandle(procInfo.hThread);
+                
                 // close the handles that are only used by the parent
                 stdInPipe.CloseReadHandle();
                 stdOutPipe.CloseWriteHandle();
@@ -187,7 +206,7 @@ private:
                 {
                     try
                     {
-                        stdInPipe.Write(stdInBytes.data(), static_cast<DWORD>(stdInBytes.size()));
+                        stdInPipe.Write(stdInBytes.data(), stdInBytes.size());
                     }
                     catch (std::system_error &e)
                     {
@@ -205,21 +224,21 @@ private:
                 auto stdErrReader = std::async(std::launch::async, &StdPipe::Read, &stdErrPipe);
 
                 // check for abort signal or pipe read errors while process is still running
-                while (WAIT_TIMEOUT == ::WaitForSingleObject(procInfo.hProcess, 50))
+                while (WAIT_TIMEOUT == ::WaitForSingleObject(processHandle.get(), 50))
                 {
                     // If the reader already has a result there must have been an exception --> stop execution
                     if (stdOutReader.wait_for(std::chrono::seconds(0)) == std::future_status::ready || 
                         stdErrReader.wait_for(std::chrono::seconds(0)) == std::future_status::ready || 
                         abortEvent.IsSet())
                     {
-                        ::TerminateProcess(procInfo.hProcess, ERROR_PROCESS_ABORTED);
+                        ::TerminateProcess(processHandle.get(), ERROR_PROCESS_ABORTED);
                         break;
                     }
                 }
 
-                ::GetExitCodeProcess(procInfo.hProcess, &exitCode);
-                ::CloseHandle(procInfo.hProcess);
-                ::CloseHandle(procInfo.hThread);
+                ::GetExitCodeProcess(processHandle.get(), &exitCode);
+                // Process handles will be automatically closed by UniqueHandle destructors
+                // EOF signaling to pipes happens when child process exits (not related to these handles)
 
                 try
                 {
@@ -268,31 +287,6 @@ private:
     // Get the error message for a given error code
     static std::string GetErrorString(std::error_code const& code)
     {
-        // MSVC++ prior to VS2015 does not map all system error codes within std::system_category
-        // --> use FormatMessage to retrieve proper error message
-
-#if _MSC_VER <= 1800 // VS 2015 and above	
-        if (code.message() == "unknown error")
-        {
-
-            if (code.value() == 0) { return std::string(); }
-
-            char* strBuffer = nullptr;
-            auto size = ::FormatMessageA(
-                FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                nullptr,
-                code.value(),
-                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                reinterpret_cast<LPSTR>(&strBuffer),
-                0,
-                NULL);
-
-            auto str = std::string(strBuffer, size);
-            ::LocalFree(strBuffer);
-
-            return str;
-        }
-    #endif
         return code.message();
     }
 
@@ -302,5 +296,3 @@ private:
 
     WindowMode windowMode = { WindowMode::Hidden };
 };
-
-
