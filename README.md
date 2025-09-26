@@ -1,7 +1,7 @@
 # PipedProcess
 
-C++ helper class to create a child process with redirected std in/out/error streams 
-using the Windows API.
+C++ helper class to create a child process with redirected std in/out/error streams using the Windows API.
+[Want to use it with .net?](README.NET.md)
 
 ## What it does
 
@@ -58,6 +58,7 @@ void SetWindowMode(WindowMode mode);  // Default is Hidden
 ### Return Values
 
 All `Run` methods return `DWORD` error codes:
+
 - `0` = Success (child process completed successfully)
 - `ERROR_INVALID_PARAMETER` = Null parameters provided
 - `ERROR_FILE_NOT_FOUND` = Program executable not found
